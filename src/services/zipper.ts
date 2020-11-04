@@ -49,7 +49,8 @@ export default class Zipper {
             if (fs.lstatSync(srcDir).isDirectory()) {
                 this.log.debug('Discovering files in source directory.');
                 // followLinks is set to true to conform to Common Client behavior.
-                const walker = walk(this.srcDir, { followLinks: true });
+                //I change to fasle due to customer issue investigation https://checkmarx.lightning.force.com/lightning/r/Case/5003z00002C1zlrAAB/view
+                const walker = walk(this.srcDir, { followLinks: false });
                 walker.on('file', this.addFileToArchive);
                 walker.on('end', () => {
                     this.log.debug('Finished discovering files in source directory.');
