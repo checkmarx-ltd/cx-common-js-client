@@ -1,4 +1,4 @@
-import {ProxyConfig, ScanConfig} from "../..";
+import { ProxyConfig, ScanConfig } from "../..";
 import { HttpClient } from "./httpClient";
 import Zipper from "../zipper";
 import { TaskSkippedError } from "../..";
@@ -37,10 +37,10 @@ export class CxClient {
     private config: ScanConfig | any;
     private sastConfig: SastConfig | any;
     private scaConfig: ScaConfig | any;
-    private proxyConfig : ProxyConfig | any;
+    private proxyConfig: ProxyConfig | any;
 
     private swaggerLocation = 'help/swagger/docs/v1.1';
-    private isNewProject:boolean = false;
+    private isNewProject: boolean = false;
     constructor(private readonly log: Logger) {
     }
 
@@ -90,11 +90,12 @@ export class CxClient {
         const baseUrl = url.resolve(this.sastConfig.serverUrl, 'CxRestAPI/');
 
         if (!httpClient) {
-            if(this.config.enableProxy && this.config.proxyConfig && this.proxyConfig.proxyHost!=''){
-                this.httpClient = new HttpClient(baseUrl, this.config.cxOrigin, this.log,this.proxyConfig);
-            }else{
+            if (this.config.enableProxy && this.config.proxyConfig && (this.proxyConfig.proxyHost != '' || this.proxyConfig.proxyUrl != '')) {
+                this.httpClient = new HttpClient(baseUrl, this.config.cxOrigin, this.log, this.proxyConfig);
+            } else {
                 this.httpClient = new HttpClient(baseUrl, this.config.cxOrigin, this.log);
             }
+            await this.httpClient.getPacProxyResolve();
             await this.httpClient.login(this.sastConfig.username, this.sastConfig.password);
         }
         else {
@@ -111,13 +112,14 @@ export class CxClient {
 
     private async initScaClient() {
         let scaHttpClient: HttpClient;
-        if(this.config.enableProxy && this.config.proxyConfig && this.proxyConfig.proxyHost!=''){
-            scaHttpClient = new HttpClient(this.scaConfig.apiUrl, this.config.cxOrigin, this.log,this.proxyConfig);
-        }else{
+        if (this.config.enableProxy && this.config.proxyConfig && (this.proxyConfig.proxyHost != '' || this.proxyConfig.proxyUrl != '')) {
+            scaHttpClient = new HttpClient(this.scaConfig.apiUrl, this.config.cxOrigin, this.log, this.proxyConfig);
+        } else {
             scaHttpClient = new HttpClient(this.scaConfig.apiUrl, this.config.cxOrigin, this.log);
         }
 
-        this.scaClient = new ScaClient(this.scaConfig, this.config.sourceLocation, scaHttpClient, this.log,this.config);
+        this.scaClient = new ScaClient(this.scaConfig, this.config.sourceLocation, scaHttpClient, this.log, this.config);
+        await this.scaClient.httpClient.getPacProxyResolve();
         await this.scaClient.scaLogin(this.scaConfig);
         await this.scaClient.resolveProject(this.config.projectName);
     }
@@ -184,10 +186,10 @@ export class CxClient {
         let projectId = await this.getCurrentProjectId();
         if (projectId) {
             this.log.debug(`Resolved project ID: ${projectId}`);
-            this.isNewProject=false;
+            this.isNewProject = false;
         } else {
             this.log.info('Project not found, creating a new one.');
-            this.isNewProject=true;
+            this.isNewProject = true;
             if (this.sastConfig.denyProject) {
                 throw Error(
                     `Creation of the new project [${this.config.projectName}] is not authorized. Please use an existing project.` +
@@ -333,18 +335,18 @@ export class CxClient {
         const client = new ReportingClient(this.httpClient, this.log);
         let reportXml;
 
-            for (let i = 1; i < 25; i++) {
-                try {
-                    reportXml = await client.generateReport(result.scanId, this.config.cxOrigin);
-                    if (typeof reportXml !== 'undefined' && reportXml !== null) {
-                        break;
-                    }
-                    await this.delay(15555);
-                } catch (e) {
-                    this.log.warning('Failed to generate report on attempt number: ' + i);
-                    await this.delay(15555);
+        for (let i = 1; i < 25; i++) {
+            try {
+                reportXml = await client.generateReport(result.scanId, this.config.cxOrigin);
+                if (typeof reportXml !== 'undefined' && reportXml !== null) {
+                    break;
                 }
+                await this.delay(15555);
+            } catch (e) {
+                this.log.warning('Failed to generate report on attempt number: ' + i);
+                await this.delay(15555);
             }
+        }
 
         const doc = reportXml.CxXMLResults;
         result.scanStart = doc.$.ScanStart;

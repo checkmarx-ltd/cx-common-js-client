@@ -1,12 +1,14 @@
 import * as url from 'url';
 import * as path from "path";
 import * as request from 'superagent';
-import {Logger} from "../logger";
-import {ScaLoginSettings} from "../../dto/sca/scaLoginSettings";
-import {ScaClient} from './scaClient';
-import {ProxyConfig} from "../..";
-import {ProxyHelper} from "../proxyHelper";
-import {SuperAgentRequest} from "superagent";
+import { Logger } from "../logger";
+import { ScaLoginSettings } from "../../dto/sca/scaLoginSettings";
+import { ScaClient } from './scaClient';
+import { ProxyConfig } from "../..";
+import { ProxyHelper } from "../proxyHelper";
+import { SuperAgentRequest } from "superagent";
+import fs = require('fs');
+import pac = require('pac-resolver');
 
 
 interface InternalRequestOptions extends RequestOptions {
@@ -36,12 +38,59 @@ export class HttpClient {
 
     private username = '';
     private password = '';
+    private proxyResult = '';
+    private proxyContent = '';
     private scaSettings: ScaLoginSettings | any;
     private isSsoLogin: boolean = false;
-
-    constructor(private readonly baseUrl: string, private readonly origin: string, private readonly log: Logger, private readonly proxyConfig ?: ProxyConfig) {
+    constructor(private readonly baseUrl: string, private readonly origin: string, private readonly log: Logger, private readonly proxyConfig?: ProxyConfig) {
     }
+    async getProxyContent() {
+        require('superagent-proxy')(request);
+        if (this.proxyConfig?.proxyUrl) {
+            await request.get(this.proxyConfig?.proxyUrl)
+                .accept('json')
+                .then((res: { text: string; }) => {
+                    this.proxyContent = res.text;
+                });
+        }
+    }
+    async getPacProxyResolve() {
+        if (this.proxyConfig) {
+            if (this.proxyConfig.proxyUrl) {
+                if (this.proxyConfig.proxyUrl.startsWith("pac", 0) || this.proxyConfig.proxyUrl.startsWith("PAC", 0)) {
+                    this.proxyConfig.proxyUrl = this.proxyConfig.proxyUrl.replace("pac+", "");
+                    await this.getProxyContent();
+                    let FindProxyForURL = pac(this.proxyContent);
+                    await FindProxyForURL(this.baseUrl).then((res: string) => {
+                        this.proxyResult = res;
+                        if (this.proxyConfig) {
+                            let splitted: string[];
+                            let proxyBefore: string[];
+                            if (this.proxyResult) {
+                                proxyBefore = this.proxyResult.split(";");
+                                this.proxyResult = proxyBefore[0];
+                                splitted = this.proxyResult.split(" ");
+                                if (splitted[0] == "http" || splitted[0] == "HTTP" || splitted[0] == "proxy" || splitted[0] == "PROXY")
+                                    this.proxyConfig.proxyUrl = 'http://' + splitted[1];
+                                else if (splitted[0] == "HTTPS" || splitted[0] == "https")
+                                    this.proxyConfig.proxyUrl = 'https://' + splitted[1];
+                                else if (splitted[0] == "SOCKS" || splitted[0] == "socks")
+                                    this.proxyConfig.proxyUrl = 'socks://' + splitted[1];
+                                else if (splitted[0] == "SOCKS4" || splitted[0] == "spcks4")
+                                    this.proxyConfig.proxyUrl = 'socks4://' + splitted[1];
+                                else if (splitted[0] == "SOCKS5" || splitted[0] == "socks5")
+                                    this.proxyConfig.proxyUrl = 'socks5://' + splitted[1];
+                                else
+                                    this.proxyConfig.proxyUrl = '';
+                                this.log.info("Proxy URL : "+this.proxyConfig.proxyUrl);
+                            }
+                        }
 
+                    });
+                }
+            }
+        }
+    }
     login(username: string, password: string) {
         this.log.info('Logging into the Checkmarx service.');
         this.username = username;
@@ -59,21 +108,21 @@ export class HttpClient {
     }
 
     getRequest(relativePath: string, options?: RequestOptions): Promise<any> {
-        const internalOptions: InternalRequestOptions = {retry: true, method: 'get'};
+        const internalOptions: InternalRequestOptions = { retry: true, method: 'get' };
         return this.sendRequest(relativePath, Object.assign(internalOptions, options));
     }
 
     postRequest(relativePath: string, data: object): Promise<any> {
-        return this.sendRequest(relativePath, {singlePostData: data, retry: true, method: 'post'});
+        return this.sendRequest(relativePath, { singlePostData: data, retry: true, method: 'post' });
     }
 
     putRequest(relativePath: string, data: object): Promise<any> {
-        return this.sendRequest(relativePath, {singlePostData: data, retry: true, method: 'put'});
+        return this.sendRequest(relativePath, { singlePostData: data, retry: true, method: 'put' });
     }
 
     postMultipartRequest(relativePath: string,
-                         fields: { [fieldName: string]: any },
-                         attachments: { [fieldName: string]: string }) {
+        fields: { [fieldName: string]: any },
+        attachments: { [fieldName: string]: string }) {
         return this.sendRequest(relativePath, {
             method: 'post',
             multipartPostData: {
@@ -109,7 +158,7 @@ export class HttpClient {
         }
 
         if (this.accessToken) {
-            result.auth(this.accessToken, {type: 'bearer'});
+            result.auth(this.accessToken, { type: 'bearer' });
         }
 
         if (this.cookies && this.cookies.size > 0) {
@@ -161,7 +210,7 @@ export class HttpClient {
         if (options.singlePostData) {
             result = result.send(options.singlePostData);
         } else if (options.multipartPostData) {
-            const {fields, attachments} = options.multipartPostData;
+            const { fields, attachments } = options.multipartPostData;
 
             for (const prop in fields) {
                 result = result.field(prop, fields[prop]);
@@ -188,7 +237,7 @@ export class HttpClient {
         if (proxyUrl) {
             newRequest.proxy(proxyUrl);
         }
-        return  newRequest.send({
+        return newRequest.send({
             userName: this.username,
             password: this.password,
             grant_type: 'password',
