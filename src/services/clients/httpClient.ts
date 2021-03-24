@@ -61,31 +61,32 @@ export class HttpClient {
                     this.proxyConfig.proxyUrl = this.proxyConfig.proxyUrl.replace("pac+", "");
                     await this.getProxyContent();
                     let FindProxyForURL = pac(this.proxyContent);
-                    await FindProxyForURL(this.baseUrl).then((res: string) => {
+                    await FindProxyForURL(this.baseUrl,"").then((res) => {
                         this.proxyResult = res;
                         if (this.proxyConfig) {
-                            let splitted: string[];
-                            let proxyBefore: string[];
+                            let splitted;
+                            let proxyBefore;
                             if (this.proxyResult) {
                                 proxyBefore = this.proxyResult.split(";");
                                 this.proxyResult = proxyBefore[0];
                                 splitted = this.proxyResult.split(" ");
-                                if (splitted[0] == "http" || splitted[0] == "HTTP" || splitted[0] == "proxy" || splitted[0] == "PROXY")
+                                if (splitted[0].toUpperCase() == "HTTP" || splitted[0].toUpperCase() == "PROXY")
                                     this.proxyConfig.proxyUrl = 'http://' + splitted[1];
-                                else if (splitted[0] == "HTTPS" || splitted[0] == "https")
+                                else if (splitted[0].toUpperCase() == "HTTPS")
                                     this.proxyConfig.proxyUrl = 'https://' + splitted[1];
-                                else if (splitted[0] == "SOCKS" || splitted[0] == "socks")
+                                else if (splitted[0].toUpperCase() == "SOCKS" )
                                     this.proxyConfig.proxyUrl = 'socks://' + splitted[1];
-                                else if (splitted[0] == "SOCKS4" || splitted[0] == "spcks4")
+                                else if (splitted[0].toUpperCase() == "SOCKS4")
                                     this.proxyConfig.proxyUrl = 'socks4://' + splitted[1];
-                                else if (splitted[0] == "SOCKS5" || splitted[0] == "socks5")
+                                else if (splitted[0].toUpperCase() == "SOCKS5")
                                     this.proxyConfig.proxyUrl = 'socks5://' + splitted[1];
-                                else
+                                else if (splitted[0].toUpperCase() == "DIRECT")
                                     this.proxyConfig.proxyUrl = '';
-                                this.log.info("Proxy URL : "+this.proxyConfig.proxyUrl);
+                                else if (splitted[0].toUpperCase() != "HTTP" || splitted[0].toUpperCase() != "PROXY" || splitted[0].toUpperCase() != "SOCKS" || splitted[0].toUpperCase() != "SOCKS4" || splitted[0].toUpperCase() != "SOCKS5")
+                                    this.log.warning("We Support only http,https,socks,socks4,socks5 please correct ");
+                                this.log.info("Proxy URL : " + this.proxyConfig.proxyUrl);
                             }
                         }
-
                     });
                 }
             }
