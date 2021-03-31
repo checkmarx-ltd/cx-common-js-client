@@ -42,7 +42,7 @@ export class HttpClient {
     private proxyContent = '';
     private scaSettings: ScaLoginSettings | any;
     private isSsoLogin: boolean = false;
-    constructor(private readonly baseUrl: string, private readonly origin: string, private readonly log: Logger, private readonly proxyConfig?: ProxyConfig) {
+    constructor(private readonly baseUrl: string, private readonly origin: string, private readonly log: Logger, private proxyConfig?: ProxyConfig) {
     }
     async getProxyContent() {
         require('superagent-proxy')(request);
@@ -57,9 +57,10 @@ export class HttpClient {
     async getPacProxyResolve() {
         if (this.proxyConfig) {
             if (this.proxyConfig.proxyUrl) {
-                if (this.proxyConfig.proxyUrl.startsWith("pac", 0) || this.proxyConfig.proxyUrl.startsWith("PAC", 0)) {
-                    this.proxyConfig.proxyUrl = this.proxyConfig.proxyUrl.replace("pac+", "");
+               let urlSplit= this.proxyConfig.proxyUrl.split("/");
+               if(urlSplit.length>=3 && urlSplit[3] !=null){
                     await this.getProxyContent();
+                    if(this.proxyContent){
                     let FindProxyForURL = pac(this.proxyContent);
                     await FindProxyForURL(this.baseUrl,"").then((res) => {
                         this.proxyResult = res;
@@ -72,6 +73,8 @@ export class HttpClient {
                                 splitted = this.proxyResult.split(" ");
                                 if (splitted[0].toUpperCase() == "HTTP" || splitted[0].toUpperCase() == "PROXY")
                                     this.proxyConfig.proxyUrl = 'http://' + splitted[1];
+                                else if (splitted[0].toUpperCase() == "DIRECT")
+                                    this.proxyConfig=undefined;
                                 else if (splitted[0].toUpperCase() == "HTTPS")
                                     this.proxyConfig.proxyUrl = 'https://' + splitted[1];
                                 else if (splitted[0].toUpperCase() == "SOCKS" )
@@ -80,17 +83,18 @@ export class HttpClient {
                                     this.proxyConfig.proxyUrl = 'socks4://' + splitted[1];
                                 else if (splitted[0].toUpperCase() == "SOCKS5")
                                     this.proxyConfig.proxyUrl = 'socks5://' + splitted[1];
-                                else if (splitted[0].toUpperCase() == "DIRECT")
-                                    this.proxyConfig.proxyUrl = '';
                                 else if (splitted[0].toUpperCase() != "HTTP" || splitted[0].toUpperCase() != "PROXY" || splitted[0].toUpperCase() != "SOCKS" || splitted[0].toUpperCase() != "SOCKS4" || splitted[0].toUpperCase() != "SOCKS5")
                                     this.log.warning("We Support only http,https,socks,socks4,socks5 please correct ");
-                                this.log.info("Proxy URL : " + this.proxyConfig.proxyUrl);
+                                if(this.proxyConfig)
+                                    this.log.info("Proxy URL : " + this.proxyConfig.proxyUrl);
                             }
                         }
                     });
                 }
             }
+            
         }
+    }
     }
     login(username: string, password: string) {
         this.log.info('Logging into the Checkmarx service.');
