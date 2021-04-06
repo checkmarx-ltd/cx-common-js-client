@@ -45,21 +45,25 @@ export class HttpClient {
     constructor(private readonly baseUrl: string, private readonly origin: string, private readonly log: Logger, private proxyConfig?: ProxyConfig) {
     }
     async getProxyContent() {
-        require('superagent-proxy')(request);
-        if (this.proxyConfig?.proxyUrl) {
+        try{ 
+           require('superagent-proxy')(request);
+           if (this.proxyConfig?.proxyUrl) {
             await request.get(this.proxyConfig?.proxyUrl)
                 .accept('json')
                 .then((res: { text: string; }) => {
                     this.proxyContent = res.text;
                 });
         }
+        }catch(e){
+            this.log.error(" Pac file is not found or Empty.Hence ignoring the proxy");
+            this.proxyConfig=undefined;
+        }
     }
     async getPacProxyResolve() {
-        if (this.proxyConfig) {
-            if (this.proxyConfig.proxyUrl) {
+        if (this.proxyConfig && this.proxyConfig.proxyUrl) {
                let urlSplit= this.proxyConfig.proxyUrl.split("/");
-               if(urlSplit.length>=3 && urlSplit[3] !=null){
-                    await this.getProxyContent();
+               if( urlSplit[3] !=null && urlSplit.length>=3 ){
+                   await this.getProxyContent();
                     if(this.proxyContent){
                     let FindProxyForURL = pac(this.proxyContent);
                     await FindProxyForURL(this.baseUrl,"").then((res) => {
@@ -68,34 +72,50 @@ export class HttpClient {
                             let splitted;
                             let proxyBefore;
                             if (this.proxyResult) {
-                                proxyBefore = this.proxyResult.split(";");
+                                proxyBefore = this.proxyResult.split(";");//keep in seperate field
                                 this.proxyResult = proxyBefore[0];
-                                splitted = this.proxyResult.split(" ");
-                                if (splitted[0].toUpperCase() == "HTTP" || splitted[0].toUpperCase() == "PROXY")
-                                    this.proxyConfig.proxyUrl = 'http://' + splitted[1];
-                                else if (splitted[0].toUpperCase() == "DIRECT")
-                                    this.proxyConfig=undefined;
-                                else if (splitted[0].toUpperCase() == "HTTPS")
-                                    this.proxyConfig.proxyUrl = 'https://' + splitted[1];
-                                else if (splitted[0].toUpperCase() == "SOCKS" )
-                                    this.proxyConfig.proxyUrl = 'socks://' + splitted[1];
-                                else if (splitted[0].toUpperCase() == "SOCKS4")
-                                    this.proxyConfig.proxyUrl = 'socks4://' + splitted[1];
-                                else if (splitted[0].toUpperCase() == "SOCKS5")
-                                    this.proxyConfig.proxyUrl = 'socks5://' + splitted[1];
-                                else if (splitted[0].toUpperCase() != "HTTP" || splitted[0].toUpperCase() != "PROXY" || splitted[0].toUpperCase() != "SOCKS" || splitted[0].toUpperCase() != "SOCKS4" || splitted[0].toUpperCase() != "SOCKS5")
-                                    this.log.warning("We Support only http,https,socks,socks4,socks5 please correct ");
-                                if(this.proxyConfig)
-                                    this.log.info("Proxy URL : " + this.proxyConfig.proxyUrl);
+                                splitted = this.proxyResult.split(" ");//check for splitted[0] undefined
+                                this.getProxyType(splitted);
                             }
                         }
                     });
                 }
             }
-            
-        }
     }
+        if(this.proxyConfig)
+            this.log.info("Proxy URL Resolved : " + this.proxyConfig.proxyUrl);
+       
     }
+
+
+    getProxyType(splitted: string[]){
+       if (this.proxyConfig && this.proxyConfig.proxyUrl){
+        if(splitted[0]){
+            if (splitted[0].toUpperCase() == "HTTP" || splitted[0].toUpperCase() == "PROXY")
+                this.proxyConfig.proxyUrl = 'http://' + splitted[1];
+            else if (splitted[0].toUpperCase() == "DIRECT"){
+                this.proxyConfig=undefined;
+                this.log.warning("Pac proxy resolution is DIRECT, hence ignoring proxy. ");
+                //logger Pac proxy resolution is DIRECT, hence ignoring proxy 
+            }  
+            else if (splitted[0].toUpperCase() == "HTTPS")
+                this.proxyConfig.proxyUrl = 'https://' + splitted[1];
+            else if (splitted[0].toUpperCase() == "SOCKS" )
+                this.proxyConfig.proxyUrl = 'socks://' + splitted[1];
+            else if (splitted[0].toUpperCase() == "SOCKS4")
+                this.proxyConfig.proxyUrl = 'socks4://' + splitted[1];
+            else if (splitted[0].toUpperCase() == "SOCKS5")
+                this.proxyConfig.proxyUrl = 'socks5://' + splitted[1];
+            else if (splitted[0].toUpperCase() != "HTTP" || splitted[0].toUpperCase() != "PROXY" || splitted[0].toUpperCase() != "SOCKS" || splitted[0].toUpperCase() != "SOCKS4" || splitted[0].toUpperCase() != "SOCKS5")
+                    {
+                this.log.warning("Unsupported proxy type detected in Pac proxy file. Detected Type:  "+splitted[0].toUpperCase()+ " Supported types are http,https,socks,socks4,socks5. ");
+                     }
+            }
+       }
+    }
+
+
+
     login(username: string, password: string) {
         this.log.info('Logging into the Checkmarx service.');
         this.username = username;
