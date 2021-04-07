@@ -6,7 +6,7 @@ export class ProxyHelper {
         let protocol;
         let host;
         let proxyURL;
-        if (proxy.proxyUrl != '' && proxy.proxyUrl != null) {
+        if (proxy.proxyUrl != '' && proxy.proxyUrl != undefined) {
             return proxy.proxyUrl;
         }
         if (proxy.proxyHost.startsWith('https://')) {

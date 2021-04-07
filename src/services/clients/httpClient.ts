@@ -47,22 +47,23 @@ export class HttpClient {
     async getProxyContent() {
         try{ 
            require('superagent-proxy')(request);
-           if (this.proxyConfig?.proxyUrl) {
-            await request.get(this.proxyConfig?.proxyUrl)
+           if (this.proxyConfig && this.proxyConfig.proxyUrl) {
+            await request.get(this.proxyConfig.proxyUrl)
                 .accept('json')
                 .then((res: { text: string; }) => {
                     this.proxyContent = res.text;
                 });
         }
         }catch(e){
-            this.log.error(" Pac file is not found or Empty.Hence ignoring the proxy");
+            this.log.error(" Pac file is not found or empty.Hence ignoring the proxy");
             this.proxyConfig=undefined;
         }
     }
+    //**This function is for getting pac proxy resolve 
     async getPacProxyResolve() {
         if (this.proxyConfig && this.proxyConfig.proxyUrl) {
                let urlSplit= this.proxyConfig.proxyUrl.split("/");
-               if( urlSplit[3] !=null && urlSplit.length>=3 ){
+               if( urlSplit[3] !=undefined && urlSplit.length>=3 ){
                    await this.getProxyContent();
                     if(this.proxyContent){
                     let FindProxyForURL = pac(this.proxyContent);
@@ -72,9 +73,9 @@ export class HttpClient {
                             let splitted;
                             let proxyBefore;
                             if (this.proxyResult) {
-                                proxyBefore = this.proxyResult.split(";");//keep in seperate field
+                                proxyBefore = this.proxyResult.split(";");
                                 this.proxyResult = proxyBefore[0];
-                                splitted = this.proxyResult.split(" ");//check for splitted[0] undefined
+                                splitted = this.proxyResult.split(" ");
                                 this.getProxyType(splitted);
                             }
                         }
@@ -87,7 +88,7 @@ export class HttpClient {
        
     }
 
-
+    //If the pac proxy returning diffrent type then checking and adding it to url and forming final url 
     getProxyType(splitted: string[]){
        if (this.proxyConfig && this.proxyConfig.proxyUrl){
         if(splitted[0]){
@@ -96,7 +97,6 @@ export class HttpClient {
             else if (splitted[0].toUpperCase() == "DIRECT"){
                 this.proxyConfig=undefined;
                 this.log.warning("Pac proxy resolution is DIRECT, hence ignoring proxy. ");
-                //logger Pac proxy resolution is DIRECT, hence ignoring proxy 
             }  
             else if (splitted[0].toUpperCase() == "HTTPS")
                 this.proxyConfig.proxyUrl = 'https://' + splitted[1];
