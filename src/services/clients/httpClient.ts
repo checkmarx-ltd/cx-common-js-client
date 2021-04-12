@@ -61,13 +61,20 @@ export class HttpClient {
     }
     //**This function is for getting pac proxy resolve 
     async getPacProxyResolve() {
+
+        try{
         if (this.proxyConfig && this.proxyConfig.proxyUrl) {
                let urlSplit= this.proxyConfig.proxyUrl.split("/");
                if( urlSplit[3] !=undefined && urlSplit.length>=3 ){
                    await this.getProxyContent();
                     if(this.proxyContent){
-                    let FindProxyForURL = pac(this.proxyContent);
-                    await FindProxyForURL(this.baseUrl,"").then((res) => {
+
+                    let FindProxyForURL = pac(this.proxyContent);                    
+                    const urlComponents = url.parse(this.baseUrl);                    
+                    var hostName = urlComponents.hostname;
+                    this.log.info("Resolving proxy for URL: "+ this.baseUrl + " and Hostname: "+ hostName);                     
+                    await FindProxyForURL(this.baseUrl,hostName).then((res) => {
+
                         this.proxyResult = res;
                         if (this.proxyConfig) {
                             let splitted;
@@ -85,6 +92,10 @@ export class HttpClient {
     }
         if(this.proxyConfig)
             this.log.info("Proxy URL Resolved : " + this.proxyConfig.proxyUrl);
+
+    }catch(err){
+        this.log.error(`Error occurred while trying to resolve proxy. ${err}`);
+    }
        
     }
 
