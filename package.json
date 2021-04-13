@@ -1,6 +1,6 @@
 {
   "name": "@checkmarx/cx-common-js-client",
-  "version": "0.1.52",
+  "version": "0.1.53",
   "description": "Client for interaction with Checkmarx products.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
