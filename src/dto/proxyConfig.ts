@@ -4,4 +4,5 @@ export interface ProxyConfig {
     proxyUser: string | undefined;
     proxyPass: string | undefined;
     proxyUrl: string | undefined;
+    resolvedProxyUrl: string | undefined;
 }

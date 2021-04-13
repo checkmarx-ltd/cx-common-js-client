@@ -82,16 +82,19 @@ export class HttpClient {
                             if (this.proxyResult) {
                                 proxyBefore = this.proxyResult.split(";");
                                 this.proxyResult = proxyBefore[0];
+                                this.proxyResult = this.proxyResult.replace(/\s+/g, ' ').trim();
                                 splitted = this.proxyResult.split(" ");
                                 this.getProxyType(splitted);
                             }
                         }
                     });
                 }
+            }else{
+                this.proxyConfig.resolvedProxyUrl = this.proxyConfig.proxyUrl;
             }
     }
         if(this.proxyConfig)
-            this.log.info("Proxy URL Resolved : " + this.proxyConfig.proxyUrl);
+            this.log.info("Proxy URL Resolved : " + this.proxyConfig.resolvedProxyUrl);
 
     }catch(err){
         this.log.error(`Error occurred while trying to resolve proxy. ${err}`);
@@ -104,22 +107,22 @@ export class HttpClient {
        if (this.proxyConfig && this.proxyConfig.proxyUrl){
         if(splitted[0]){
             if (splitted[0].toUpperCase() == "HTTP" || splitted[0].toUpperCase() == "PROXY")
-                this.proxyConfig.proxyUrl = 'http://' + splitted[1];
+                this.proxyConfig.resolvedProxyUrl = 'http://' + splitted[1];
             else if (splitted[0].toUpperCase() == "DIRECT"){
                 this.proxyConfig=undefined;
-                this.log.warning("Pac proxy resolution is DIRECT, hence ignoring proxy. ");
+                this.log.warning("PAC proxy resolved as DIRECT, hence ignoring the proxy. ");
             }  
             else if (splitted[0].toUpperCase() == "HTTPS")
-                this.proxyConfig.proxyUrl = 'https://' + splitted[1];
+                this.proxyConfig.resolvedProxyUrl = 'https://' + splitted[1];
             else if (splitted[0].toUpperCase() == "SOCKS" )
-                this.proxyConfig.proxyUrl = 'socks://' + splitted[1];
+                this.proxyConfig.resolvedProxyUrl = 'socks://' + splitted[1];
             else if (splitted[0].toUpperCase() == "SOCKS4")
-                this.proxyConfig.proxyUrl = 'socks4://' + splitted[1];
+                this.proxyConfig.resolvedProxyUrl = 'socks4://' + splitted[1];
             else if (splitted[0].toUpperCase() == "SOCKS5")
-                this.proxyConfig.proxyUrl = 'socks5://' + splitted[1];
+                this.proxyConfig.resolvedProxyUrl = 'socks5://' + splitted[1];
             else if (splitted[0].toUpperCase() != "HTTP" || splitted[0].toUpperCase() != "PROXY" || splitted[0].toUpperCase() != "SOCKS" || splitted[0].toUpperCase() != "SOCKS4" || splitted[0].toUpperCase() != "SOCKS5")
                     {
-                this.log.warning("Unsupported proxy type detected in Pac proxy file. Detected Type:  "+splitted[0].toUpperCase()+ " Supported types are http,https,socks,socks4,socks5. ");
+                this.log.warning("Unsupported proxy type detected in the PAC proxy file. Detected Type is:  "+splitted[0].toUpperCase()+ " Supported types are http,https,socks,socks4,socks5. ");
                      }
             }
        }
@@ -179,6 +182,7 @@ export class HttpClient {
         let proxyUrl;
         if (this.proxyConfig) {
             proxyUrl = ProxyHelper.getFormattedProxy(this.proxyConfig);
+            this.log.debug('Request is being routed via proxy ' + proxyUrl);
         }
 
         let result: SuperAgentRequest;
@@ -266,6 +270,7 @@ export class HttpClient {
         let proxyUrl;
         if (this.proxyConfig) {
             proxyUrl = ProxyHelper.getFormattedProxy(this.proxyConfig);
+            this.log.debug('Request is being routed via proxy ' + proxyUrl);
         }
         let newRequest = request
             .post(fullUrl)
@@ -302,6 +307,7 @@ export class HttpClient {
         let proxyUrl;
         if (this.proxyConfig) {
             proxyUrl = ProxyHelper.getFormattedProxy(this.proxyConfig);
+            this.log.debug('Request is being routed via proxy ' + proxyUrl);
         }
         let newRequest = request
             .post(fullUrl)
