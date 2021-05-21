@@ -1,4 +1,4 @@
-import {Logger, ScaConfig, ScanConfig} from "../..";
+import {Logger, PollingSettings, ScaConfig, ScanConfig, Waiter} from "../..";
 import { HttpClient } from "./httpClient";
 import { Stopwatch } from "../stopwatch";
 import { ScaLoginSettings } from "../../dto/sca/scaLoginSettings";
@@ -26,6 +26,13 @@ import { ScanSummary } from "../../dto/scanSummary";
 import { ScaFingerprintCollector } from '../../dto/sca/scaFingerprintCollector';
 import * as path from "path";
 import ClientTypeResolver from "../clientTypeResolver";
+import { ScanProvider } from "../../dto/api/scanProvider";
+import { PolicyViolationGroup } from "../../dto/api/policyViolationGroup";
+import { ArmStatus } from "../../dto/api/armStatus";
+import { report } from "superagent";
+import { PolicyEvaluation } from "../../dto/api/PolicyEvaluation";
+import { PolicyAction } from "../../dto/api/PolicyAction";
+import { PolicyRule } from "../../dto/api/PolicyRule";
 
 /**
  * SCA - Software Composition Analysis - is the successor of OSA.
@@ -54,7 +61,10 @@ export class ScaClient {
     private scanId: string = '';
 
     private readonly stopwatch = new Stopwatch();
-
+    private static readonly pollingSettings: PollingSettings = {
+        intervalSeconds: 10,
+        masterTimeoutMinutes: 20
+    };
     constructor(private readonly config: ScaConfig,
         private readonly sourceLocation: string,
         private readonly httpClient: HttpClient,
@@ -289,6 +299,7 @@ export class ScaClient {
             `********************************************
 The Build Failed for the Following Reasons:
 ********************************************`);
+    this.logPolicyCheckError(failure.policyCheck);
         if (failure.thresholdErrors.length) {
             this.log.error('Exceeded CxSCA Vulnerability Threshold.');
             for (const error of failure.thresholdErrors) {
@@ -303,22 +314,71 @@ The Build Failed for the Following Reasons:
         await waiter.waitForScanToFinish();
         const scaResults: SCAResults = await this.retrieveScanResults();
         const scaReportResults: ScaReportResults = new ScaReportResults(scaResults, this.config);
-
+        await this.addScaPolicyViolationsToScanResults(scaResults);
+        await this.printPolicyEvaluation(scaResults.scaPolicyViolation,this.config.scaEnablePolicyViolations);
+        await this.determinePolicyViolation(scaResults);
         const vulResults = {
             highResults: scaReportResults.highVulnerability,
             mediumResults: scaReportResults.mediumVulnerability,
             lowResults: scaReportResults.lowVulnerability
         };
         const evaluator = new ScaSummaryEvaluator(this.config);
-        const summary = evaluator.getScanSummary(vulResults);
-        if (summary.hasThresholdErrors()) {
+        const summary = evaluator.getScanSummary(vulResults,scaResults);
+
+        if (summary.hasErrors()) {
             result.buildFailed = true;
             this.logBuildFailure(summary);
         }
-
         result.scaResults = scaReportResults;
     }
 
+    private async determinePolicyViolation(scaResults: SCAResults) {
+        const PolicyEvaluation = scaResults.scaPolicyViolation;
+        if (PolicyEvaluation) {
+            for (const index in PolicyEvaluation) {
+                if (PolicyEvaluation[index].actions.breakBuild) {
+                    scaResults.scaPolicies.push(PolicyEvaluation[index].name);
+                }
+            }
+        }
+    }
+
+    private logPolicyCheckError(policyCheck: { violatedPolicyNames: string[] }) {
+        if (policyCheck.violatedPolicyNames.length) {
+            this.log.error('Project policy status: violated');
+        }
+    }
+
+    private async printPolicyEvaluation(policy:PolicyEvaluation[],isPolicyViolationEnabled:boolean){
+        if(isPolicyViolationEnabled && policy){
+        for (let index = 0; index < policy.length; index++) {
+            let rules:PolicyRule[]=[];
+            const pol = policy[index];
+            this.log.info("  Policy name: " + pol.name + " | Violated:" + pol.isViolated + " | Policy Description: " + pol.description);
+            rules=pol.rules;
+            rules.forEach( (value) => {
+                this.log.info("  Rule name: " + value.name+" | Violated: "+value.isViolated);
+            });
+        }
+      }
+    }
+
+    private async addScaPolicyViolationsToScanResults(result: SCAResults) {
+        if (!this.config.scaEnablePolicyViolations) {
+            return;
+        }
+        this.log.debug(" Fetching SCA policy violation. ");
+        const reportID=await this.getReportId();
+        const policyEvaluation = await this.getProjectViolations(reportID);
+        this.log.debug(" Successfully fetched SCA policy violations. ");
+        result.scaPolicyViolation=policyEvaluation;
+    }
+
+    private async getProjectViolations(reportID : string): Promise<PolicyEvaluation[]> {
+        const path = `policy-management/policy-evaluation/?reportId=${reportID}`;
+        return this.httpClient.getRequest(path, { baseUrlOverride: this.config.apiUrl });
+    }
+    
     private async retrieveScanResults(): Promise<SCAResults> {
         this.log.info("Retrieving CxSCA scan results.");
         try {

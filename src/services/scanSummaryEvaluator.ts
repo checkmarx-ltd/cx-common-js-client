@@ -1,11 +1,12 @@
 import { ThresholdError } from "../dto/thresholdError";
 import { ScanSummary } from "../dto/scanSummary";
+import { SCAResults } from "../dto/sca/scaResults";
 
 export abstract class ScanSummaryEvaluator {
     /**
      * Generates scan summary with error info, if any.
      */
-    protected abstract getScanSummary(scanResult: any): ScanSummary;
+    protected abstract getScanSummary(scanResult: any,scaResults:SCAResults): ScanSummary;
 
     protected static getThresholdErrors(vulnerabilityThreshold: boolean, scanResult: any, config: any) {
         let result: ThresholdError[];

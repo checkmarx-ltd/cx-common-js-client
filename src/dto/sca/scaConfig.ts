@@ -18,4 +18,5 @@ export interface ScaConfig {
     highThreshold?: number;
     mediumThreshold?: number;
     lowThreshold?: number;
+    scaEnablePolicyViolations: boolean;
 }
