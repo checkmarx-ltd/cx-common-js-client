@@ -19,4 +19,12 @@ export interface ScaConfig {
     mediumThreshold?: number;
     lowThreshold?: number;
     scaEnablePolicyViolations: boolean;
+    sastProjectId:string;
+    sastProjectName:string;
+    sastServerUrl:string;
+    sastUsername:string;
+    sastPassword:string;
+    configFilePaths:string[];
+    envVariables:Map<string, string>;
+
 }

@@ -1,4 +1,4 @@
-import {Logger, PollingSettings, ScaConfig, ScanConfig, Waiter} from "../..";
+import { Logger, PollingSettings, SastConfig, ScaConfig, ScanConfig, Waiter } from "../..";
 import { HttpClient } from "./httpClient";
 import { Stopwatch } from "../stopwatch";
 import { ScaLoginSettings } from "../../dto/sca/scaLoginSettings";
@@ -12,7 +12,7 @@ import { Package } from "../../dto/sca/report/package";
 import { ScanResults } from '../../dto/scanResults';
 import { SCAWaiter } from '../scaWaiter';
 import { SourceLocationType } from '../../dto/sca/sourceLocationType';
-import { tmpNameSync } from "tmp";
+import { file, tmpName,tmpNameSync } from "tmp";
 import { FilePathFilter } from "../filePathFilter";
 import Zipper from "../zipper";
 import FileIO from '../fileIO';
@@ -33,8 +33,13 @@ import { report } from "superagent";
 import { PolicyEvaluation } from "../../dto/api/PolicyEvaluation";
 import { PolicyAction } from "../../dto/api/PolicyAction";
 import { PolicyRule } from "../../dto/api/PolicyRule";
-
-/**
+import { ScanConfiguration } from "../../dto/api/ScanConfiguration";
+import { ScanConfigValue } from "../../dto/api/ScanConfigValue";
+import { ScaScanConfigValue } from "../../dto/api/ScaScanConfigValue";
+import { config } from "process";
+import { SastClient } from "./sastClient";
+const fs = require('fs');
+;/**
  * SCA - Software Composition Analysis - is the successor of OSA.
  */
 export class ScaClient {
@@ -47,6 +52,8 @@ export class ScaClient {
     private static readonly REPORT_ID: string = ScaClient.RISK_MANAGEMENT_API + "scans/%s/riskReportId";
 
     private static readonly ZIP_UPLOAD: string = "/api/uploads";
+    private static readonly SCA_CONFIG_FOLDER_NAME: string = ".cxsca.configurations";
+
     private static readonly CREATE_SCAN: string = "/api/scans";
     private static readonly GET_SCAN: string = "/api/scans/%s";
     private static readonly WEB_REPORT: string = "/#/projects/%s/reports/%s";
@@ -69,7 +76,7 @@ export class ScaClient {
         private readonly sourceLocation: string,
         private readonly httpClient: HttpClient,
         private readonly log: Logger,
-        private readonly scanConfig:ScanConfig) {
+        private readonly scanConfig: ScanConfig) {
     }
 
     private async resolveScaLoginSettings(scaConfig: ScaConfig): Promise<ScaLoginSettings> {
@@ -160,6 +167,8 @@ export class ScaClient {
             } else {
                 response = await this.submitSourceFromLocalDir();
             }
+
+
             this.scanId = this.extractScanIdFrom(response);
             this.stopwatch.start();
             this.log.info("Scan started successfully. Scan ID: " + this.scanId);
@@ -178,6 +187,7 @@ export class ScaClient {
     }
 
     private async getSourceUploadUrl(): Promise<string> {
+        this.config.includeSource
         const response: any = await this.httpClient.postRequest(ScaClient.ZIP_UPLOAD, {});
         if (!response || !response["url"]) {
             throw Error("Unable to get the upload URL.");
@@ -213,7 +223,9 @@ export class ScaClient {
         }
 
         const zipper = new Zipper(this.log, filePathFiltersAnd, filePathFiltersOr);
-
+        const tempDi=os.tmpdir();
+        const sourceL='D:\ss\settings.gradle';
+        await this.copyConfigFileToSourceDir(sourceL,tempDi);
         this.log.debug(`Zipping code from ${this.sourceLocation}, ${fingerprintsFilePath} into file ${tempFilename}`);
         const zipResult = await zipper.zipDirectory(this.sourceLocation, tempFilename, fingerprintsFilePath);
 
@@ -230,6 +242,37 @@ export class ScaClient {
         const uploadedArchiveUrl: string = await this.getSourceUploadUrl();
         await this.uploadToAWS(uploadedArchiveUrl, tempFilename);
         return await this.sendStartScanRequest(SourceLocationType.LOCAL_DIRECTORY, uploadedArchiveUrl);
+    }
+
+    private async   copyConfigFileToSourceDir(source: string,temDirectory:string) {
+        const dir = temDirectory+'//'+ScaClient.SCA_CONFIG_FOLDER_NAME;
+        const arrayOfCOnfigFilePath=this.config.configFilePaths;
+        for (let index = 0; index < arrayOfCOnfigFilePath.length; index++) {
+            const filePath = arrayOfCOnfigFilePath[index];
+            const isFileExist=this.checkFileExist(filePath);
+            if(isFileExist){
+            if (!fs.existsSync(dir)){
+                fs.mkdirSync(dir);
+                fs.copyFile(source, temDirectory, (err: any) => {
+                    if (err) throw err;
+                    this.log.info('File was copied to destination');
+                });
+            }else {
+                fs.copyFile(source, temDirectory, (err: any) => {
+                    if (err) throw err;
+                    this.log.info('File was copied to destination');
+                });
+            }
+        }
+        }
+        
+    }
+
+    private async checkFileExist(filePath : string){
+        let isFilePath=false;
+        if (fs.existsSync(filePath)) {
+            isFilePath=true;
+          } 
     }
 
     private async createScanFingerprintsFile(fingerprintsFileFilter: FilePathFilter[]): Promise<string> {
@@ -261,13 +304,13 @@ export class ScaClient {
         this.log.debug(`Sending PUT request to ${uploadUrl}`);
         const child_process = require('child_process');
         let command;
-        if(this.scanConfig.enableProxy && this.scanConfig.proxyConfig && this.scanConfig.proxyConfig.proxyHost!=''){
-            if(this.scanConfig.proxyConfig.proxyUser && this.scanConfig.proxyConfig.proxyPass){
+        if (this.scanConfig.enableProxy && this.scanConfig.proxyConfig && this.scanConfig.proxyConfig.proxyHost != '') {
+            if (this.scanConfig.proxyConfig.proxyUser && this.scanConfig.proxyConfig.proxyPass) {
                 command = `curl -U ${this.scanConfig.proxyConfig.proxyUser}:${this.scanConfig.proxyConfig.proxyPass} -x ${this.scanConfig.proxyConfig.proxyHost} -X PUT -L "${uploadUrl}" -H "Content-Type:" -T "${file}"`;
-            }else{
+            } else {
                 command = `curl -x ${this.scanConfig.proxyConfig.proxyHost} -X PUT -L "${uploadUrl}" -H "Content-Type:" -T "${file}"`;
             }
-        }else{
+        } else {
             command = `curl -X PUT -L "${uploadUrl}" -H "Content-Type:" -T "${file}"`;
         }
         child_process.execSync(command, { stdio: 'pipe' });
@@ -275,18 +318,43 @@ export class ScaClient {
 
     private async sendStartScanRequest(sourceLocation: SourceLocationType, sourceUrl: string): Promise<any> {
         this.log.info("Sending a request to start scan.");
+         
+        const ScanConfigValue = this.getScanConfig();
         const request = {
             project: {
                 id: this.projectId,
                 type: sourceLocation,
                 handler: {
                     url: sourceUrl
-                }
+                },
+                config:ScanConfigValue
             }
         };
         return await this.httpClient.postRequest(ScaClient.CREATE_SCAN, request);
     }
+    private async  getScanConfig():Promise<ScanConfiguration>{
+        //fetch from configuration
+        const sastProId:string=this.config.sastProjectId;
+        const sastSerUrl:string=this.config.sastServerUrl;
+        const sastUser:string=this.config.sastUsername;
+        const sastPass:string=this.config.sastPassword;
+        const sastProject:string=this.config.sastProjectName;
+        const ourMap: Map<string, string> = this.config.envVariables;
+        const scavalue:ScaScanConfigValue=new ScaScanConfigValue;
 
+        scavalue.sastProjectName=sastProject;
+        scavalue.sastPassword=sastPass;
+        scavalue.sastUsername=sastUser;
+        scavalue.sastProjectId=sastProId;
+        scavalue.environmentVariables=JSON.stringify(Array.from(ourMap.entries()));
+        scavalue.sastServerUrl=sastSerUrl;
+        const configValue:ScanConfiguration=new ScanConfiguration;
+        configValue.scanConfigValue=scavalue;
+        configValue.type='sca';
+
+        return configValue;
+
+    }
     private extractScanIdFrom(response: any): string {
         if (response && response["id"]) {
             return response["id"];
@@ -299,7 +367,7 @@ export class ScaClient {
             `********************************************
 The Build Failed for the Following Reasons:
 ********************************************`);
-    this.logPolicyCheckError(failure.policyCheck);
+        this.logPolicyCheckError(failure.policyCheck);
         if (failure.thresholdErrors.length) {
             this.log.error('Exceeded CxSCA Vulnerability Threshold.');
             for (const error of failure.thresholdErrors) {
@@ -315,7 +383,7 @@ The Build Failed for the Following Reasons:
         const scaResults: SCAResults = await this.retrieveScanResults();
         const scaReportResults: ScaReportResults = new ScaReportResults(scaResults, this.config);
         await this.addScaPolicyViolationsToScanResults(scaResults);
-        await this.printPolicyEvaluation(scaResults.scaPolicyViolation,this.config.scaEnablePolicyViolations);
+        await this.printPolicyEvaluation(scaResults.scaPolicyViolation, this.config.scaEnablePolicyViolations);
         await this.determinePolicyViolation(scaResults);
         const vulResults = {
             highResults: scaReportResults.highVulnerability,
@@ -323,7 +391,7 @@ The Build Failed for the Following Reasons:
             lowResults: scaReportResults.lowVulnerability
         };
         const evaluator = new ScaSummaryEvaluator(this.config);
-        const summary = evaluator.getScanSummary(vulResults,scaResults);
+        const summary = evaluator.getScanSummary(vulResults, scaResults);
 
         if (summary.hasErrors()) {
             result.buildFailed = true;
@@ -349,18 +417,18 @@ The Build Failed for the Following Reasons:
         }
     }
 
-    private async printPolicyEvaluation(policy:PolicyEvaluation[],isPolicyViolationEnabled:boolean){
-        if(isPolicyViolationEnabled && policy){
-        for (let index = 0; index < policy.length; index++) {
-            let rules:PolicyRule[]=[];
-            const pol = policy[index];
-            this.log.info("  Policy name: " + pol.name + " | Violated:" + pol.isViolated + " | Policy Description: " + pol.description);
-            rules=pol.rules;
-            rules.forEach( (value) => {
-                this.log.info("  Rule name: " + value.name+" | Violated: "+value.isViolated);
-            });
+    private async printPolicyEvaluation(policy: PolicyEvaluation[], isPolicyViolationEnabled: boolean) {
+        if (isPolicyViolationEnabled && policy) {
+            for (let index = 0; index < policy.length; index++) {
+                let rules: PolicyRule[] = [];
+                const pol = policy[index];
+                this.log.info("  Policy name: " + pol.name + " | Violated:" + pol.isViolated + " | Policy Description: " + pol.description);
+                rules = pol.rules;
+                rules.forEach((value) => {
+                    this.log.info("     Rule name: " + value.name + " | Violated: " + value.isViolated);
+                });
+            }
         }
-      }
     }
 
     private async addScaPolicyViolationsToScanResults(result: SCAResults) {
@@ -368,17 +436,17 @@ The Build Failed for the Following Reasons:
             return;
         }
         this.log.debug(" Fetching SCA policy violation. ");
-        const reportID=await this.getReportId();
+        const reportID = await this.getReportId();
         const policyEvaluation = await this.getProjectViolations(reportID);
         this.log.debug(" Successfully fetched SCA policy violations. ");
-        result.scaPolicyViolation=policyEvaluation;
+        result.scaPolicyViolation = policyEvaluation;
     }
 
-    private async getProjectViolations(reportID : string): Promise<PolicyEvaluation[]> {
+    private async getProjectViolations(reportID: string): Promise<PolicyEvaluation[]> {
         const path = `policy-management/policy-evaluation/?reportId=${reportID}`;
         return this.httpClient.getRequest(path, { baseUrlOverride: this.config.apiUrl });
     }
-    
+
     private async retrieveScanResults(): Promise<SCAResults> {
         this.log.info("Retrieving CxSCA scan results.");
         try {

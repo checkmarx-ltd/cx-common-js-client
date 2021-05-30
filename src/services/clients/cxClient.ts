@@ -293,14 +293,12 @@ export class CxClient {
         if (!this.sastConfig.enablePolicyViolations) {
             return;
         }
-
         if (!this.isPolicyEnforcementSupported) {
             this.log.warning('Policy enforcement is not supported by the current Checkmarx server version.');
             return;
         }
 
         await this.armClient.waitForArmToFinish(this.projectId);
-
         const projectViolations = await this.armClient.getProjectViolations(this.projectId, 'SAST');
         for (const policy of projectViolations) {
             result.sastPolicies.push(policy.policyName);
