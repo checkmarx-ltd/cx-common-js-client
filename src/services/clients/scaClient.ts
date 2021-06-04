@@ -38,7 +38,7 @@ import { ScanConfigValue } from "../../dto/api/ScanConfigValue";
 import { ScaScanConfigValue } from "../../dto/api/ScaScanConfigValue";
 import { config } from "process";
 import { SastClient } from "./sastClient";
-const fs = require('fs');
+
 ;/**
  * SCA - Software Composition Analysis - is the successor of OSA.
  */
@@ -150,9 +150,12 @@ export class ScaClient {
     }
 
     private async createProject(projectName: string): Promise<any> {
-        const request = {
-            name: projectName
-        };
+        const teamName = this.scanConfig.sastConfig?.teamName;
+        let teamNameArray: Array<string|undefined> = [teamName];
+            const request = {
+            name: projectName,
+            AssignedTeams:teamNameArray
+        }; 
         const newProject = await this.httpClient.postRequest(ScaClient.PROJECTS, request);
         return newProject.id;
     }
@@ -223,9 +226,7 @@ export class ScaClient {
         }
 
         const zipper = new Zipper(this.log, filePathFiltersAnd, filePathFiltersOr);
-        const tempDi=os.tmpdir();
-        const sourceL='D:\ss\settings.gradle';
-        await this.copyConfigFileToSourceDir(sourceL,tempDi);
+        await this.copyConfigFileToSourceDir();
         this.log.debug(`Zipping code from ${this.sourceLocation}, ${fingerprintsFilePath} into file ${tempFilename}`);
         const zipResult = await zipper.zipDirectory(this.sourceLocation, tempFilename, fingerprintsFilePath);
 
@@ -244,35 +245,29 @@ export class ScaClient {
         return await this.sendStartScanRequest(SourceLocationType.LOCAL_DIRECTORY, uploadedArchiveUrl);
     }
 
-    private async   copyConfigFileToSourceDir(source: string,temDirectory:string) {
-        const dir = temDirectory+'//'+ScaClient.SCA_CONFIG_FOLDER_NAME;
-        const arrayOfCOnfigFilePath=this.config.configFilePaths;
+    private async copyConfigFileToSourceDir() {
+        let temDirectory = os.tmpdir();
+        const fs = require('fs');
+        const dir = temDirectory + '\\' + ScaClient.SCA_CONFIG_FOLDER_NAME;
+        const arrayOfCOnfigFilePath = this.config.configFilePaths;
         for (let index = 0; index < arrayOfCOnfigFilePath.length; index++) {
             const filePath = arrayOfCOnfigFilePath[index];
-            const isFileExist=this.checkFileExist(filePath);
-            if(isFileExist){
-            if (!fs.existsSync(dir)){
-                fs.mkdirSync(dir);
-                fs.copyFile(source, temDirectory, (err: any) => {
-                    if (err) throw err;
-                    this.log.info('File was copied to destination');
-                });
-            }else {
-                fs.copyFile(source, temDirectory, (err: any) => {
-                    if (err) throw err;
-                    this.log.info('File was copied to destination');
-                });
+            if (fs.existsSync(filePath)) {
+                if (!fs.existsSync(dir)) {
+                    fs.mkdirSync(dir);
+                    await fs.promises.copyFile(filePath, dir);
+                    fs.copyFile(filePath, temDirectory, (err: any) => {
+                        if (err) throw err;
+                        this.log.info('File was copied to destination');
+                    });
+                } else {
+                    fs.copyFile(filePath, dir, (err: any) => {
+                        if (err) throw err;
+                        this.log.info('File was copied to destination');
+                    });
+                }
             }
         }
-        }
-        
-    }
-
-    private async checkFileExist(filePath : string){
-        let isFilePath=false;
-        if (fs.existsSync(filePath)) {
-            isFilePath=true;
-          } 
     }
 
     private async createScanFingerprintsFile(fingerprintsFileFilter: FilePathFilter[]): Promise<string> {
