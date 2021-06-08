@@ -38,7 +38,7 @@ import { ScanConfigValue } from "../../dto/api/ScanConfigValue";
 import { ScaScanConfigValue } from "../../dto/api/ScaScanConfigValue";
 import { config } from "process";
 import { SastClient } from "./sastClient";
-
+const fs = require('fs');
 ;/**
  * SCA - Software Composition Analysis - is the successor of OSA.
  */
@@ -150,7 +150,10 @@ export class ScaClient {
     }
 
     private async createProject(projectName: string): Promise<any> {
-        const teamName = this.scanConfig.sastConfig?.teamName;
+        const teamName = this.config.scaSastTeam;
+        if(!teamName || teamName=='/'){
+            this.log.error("Team name for Cx SCA is not specified. ");
+        }
         let teamNameArray: Array<string|undefined> = [teamName];
             const request = {
             name: projectName,
@@ -203,7 +206,10 @@ export class ScaClient {
         let filePathFiltersAnd: FilePathFilter[] = [new FilePathFilter(this.config.dependencyFileExtension, this.config.dependencyFolderExclusion)];
         let filePathFiltersOr: FilePathFilter[] = [];
         let fingerprintsFilePath = '';
-
+        
+        if(this.config.configFilePaths){
+        await this.copyConfigFileToSourceDir();
+        }
         if (!Boolean(this.config.includeSource)) {
             this.log.info("Using manifest and fingerprint flow.");
             const projectResolvingConfiguration = await this.fetchProjectResolvingConfiguration();
@@ -226,7 +232,7 @@ export class ScaClient {
         }
 
         const zipper = new Zipper(this.log, filePathFiltersAnd, filePathFiltersOr);
-        await this.copyConfigFileToSourceDir();
+        
         this.log.debug(`Zipping code from ${this.sourceLocation}, ${fingerprintsFilePath} into file ${tempFilename}`);
         const zipResult = await zipper.zipDirectory(this.sourceLocation, tempFilename, fingerprintsFilePath);
 
@@ -247,26 +253,17 @@ export class ScaClient {
 
     private async copyConfigFileToSourceDir() {
         let temDirectory = os.tmpdir();
-        const fs = require('fs');
-        const dir = temDirectory + '\\' + ScaClient.SCA_CONFIG_FOLDER_NAME;
-        const arrayOfCOnfigFilePath = this.config.configFilePaths;
+        let arrayOfCOnfigFilePath = this.config.configFilePaths;
         for (let index = 0; index < arrayOfCOnfigFilePath.length; index++) {
-            const filePath = arrayOfCOnfigFilePath[index];
-            if (fs.existsSync(filePath)) {
-                if (!fs.existsSync(dir)) {
-                    fs.mkdirSync(dir);
-                    await fs.promises.copyFile(filePath, dir);
-                    fs.copyFile(filePath, temDirectory, (err: any) => {
-                        if (err) throw err;
-                        this.log.info('File was copied to destination');
-                    });
-                } else {
-                    fs.copyFile(filePath, dir, (err: any) => {
-                        if (err) throw err;
-                        this.log.info('File was copied to destination');
-                    });
-                }
+            const soureFile = arrayOfCOnfigFilePath[index];
+            let filename = soureFile.replace(/^.*[\\\/]/, '');
+            let dir = temDirectory + '\\' + ScaClient.SCA_CONFIG_FOLDER_NAME;
+            
+            if (!fs.existsSync(dir)) {
+                fs.mkdirSync(dir);
             }
+            dir=dir+'\\'+filename;
+            fs.createReadStream(soureFile).pipe(fs.createWriteStream(dir));
         }
     }
 
@@ -313,8 +310,10 @@ export class ScaClient {
 
     private async sendStartScanRequest(sourceLocation: SourceLocationType, sourceUrl: string): Promise<any> {
         this.log.info("Sending a request to start scan.");
-         
-        const ScanConfigValue = this.getScanConfig();
+        let ScanConfigValue;
+         if(this.config.isExploitable){
+            ScanConfigValue = this.getScanConfig();
+         }
         const request = {
             project: {
                 id: this.projectId,
@@ -336,15 +335,16 @@ export class ScaClient {
         const sastProject:string=this.config.sastProjectName;
         const ourMap: Map<string, string> = this.config.envVariables;
         const scavalue:ScaScanConfigValue=new ScaScanConfigValue;
-
         scavalue.sastProjectName=sastProject;
         scavalue.sastPassword=sastPass;
         scavalue.sastUsername=sastUser;
         scavalue.sastProjectId=sastProId;
         scavalue.environmentVariables=JSON.stringify(Array.from(ourMap.entries()));
         scavalue.sastServerUrl=sastSerUrl;
+        let ConfigValue:ScanConfigValue;
+        ConfigValue=scavalue;
         const configValue:ScanConfiguration=new ScanConfiguration;
-        configValue.scanConfigValue=scavalue;
+        configValue.scanConfigValue=ConfigValue;
         configValue.type='sca';
 
         return configValue;
@@ -414,15 +414,18 @@ The Build Failed for the Following Reasons:
 
     private async printPolicyEvaluation(policy: PolicyEvaluation[], isPolicyViolationEnabled: boolean) {
         if (isPolicyViolationEnabled && policy) {
+            this.log.info("==============================================================================");
             for (let index = 0; index < policy.length; index++) {
                 let rules: PolicyRule[] = [];
                 const pol = policy[index];
+               
                 this.log.info("  Policy name: " + pol.name + " | Violated:" + pol.isViolated + " | Policy Description: " + pol.description);
                 rules = pol.rules;
                 rules.forEach((value) => {
                     this.log.info("     Rule name: " + value.name + " | Violated: " + value.isViolated);
                 });
             }
+            this.log.info("==============================================================================");
         }
     }
 

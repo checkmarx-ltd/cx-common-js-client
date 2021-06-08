@@ -26,5 +26,7 @@ export interface ScaConfig {
     sastPassword:string;
     configFilePaths:string[];
     envVariables:Map<string, string>;
+    scaSastTeam:string;
+    isExploitable:boolean;
 
 }

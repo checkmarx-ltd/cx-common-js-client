@@ -1,6 +1,6 @@
 import { ScanConfigValue } from "./ScanConfigValue";
 
-export class ScanConfiguration {
+export class ScanConfiguration implements ScanConfigValue{
     private _type: string = '';
 
     public get type(): string {

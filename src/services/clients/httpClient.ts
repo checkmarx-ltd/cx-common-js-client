@@ -265,7 +265,7 @@ export class HttpClient {
 
     private loginWithStoredCredentials() {
         require('superagent-proxy')(request);
-        process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+        
         const fullUrl = url.resolve(this.baseUrl, 'auth/identity/connect/token');
         let proxyUrl;
         if (this.proxyConfig) {
@@ -302,7 +302,7 @@ export class HttpClient {
     async scaLogin(settings: ScaLoginSettings) {
         require('superagent-proxy')(request);
         this.scaSettings = settings;
-        process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+        
         const fullUrl = url.resolve(settings.accessControlBaseUrl, ScaClient.AUTHENTICATION);
         let proxyUrl;
         if (this.proxyConfig) {

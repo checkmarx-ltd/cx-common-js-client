@@ -1,3 +1,3 @@
-export class ScanConfigValue{
+export interface ScanConfigValue{
     
 }
