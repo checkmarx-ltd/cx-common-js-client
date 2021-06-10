@@ -208,7 +208,7 @@ export class ScaClient {
         let fingerprintsFilePath = '';
         
         if(this.config.configFilePaths){
-        await this.copyConfigFileToSourceDir();
+        await this.copyConfigFileToSourceDir(this.sourceLocation);
         }
         if (!Boolean(this.config.includeSource)) {
             this.log.info("Using manifest and fingerprint flow.");
@@ -251,19 +251,32 @@ export class ScaClient {
         return await this.sendStartScanRequest(SourceLocationType.LOCAL_DIRECTORY, uploadedArchiveUrl);
     }
 
-    private async copyConfigFileToSourceDir() {
-        let temDirectory = os.tmpdir();
-        let arrayOfCOnfigFilePath = this.config.configFilePaths;
-        for (let index = 0; index < arrayOfCOnfigFilePath.length; index++) {
-            const soureFile = arrayOfCOnfigFilePath[index];
-            let filename = soureFile.replace(/^.*[\\\/]/, '');
-            let dir = temDirectory + '\\' + ScaClient.SCA_CONFIG_FOLDER_NAME;
-            
-            if (!fs.existsSync(dir)) {
-                fs.mkdirSync(dir);
+    private async copyConfigFileToSourceDir(sourceLocation:string) {
+        let arrayOfConfigFilePath = this.config.configFilePaths;
+        for (let index = 0; index < arrayOfConfigFilePath.length; index++) {
+            let sourceFile = arrayOfConfigFilePath[index];
+            let fileSeperator = path.sep;
+            //extracting filename from source file to to destination path
+            let format = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+/;
+            if(!(format.test(sourceFile))){
+                sourceFile=sourceLocation+fileSeperator+sourceFile;
             }
-            dir=dir+'\\'+filename;
-            fs.createReadStream(soureFile).pipe(fs.createWriteStream(dir));
+            //extracting filename from source file
+            let filename = sourceFile.replace(/^.*[\\\/]/, '');
+            let destDir = sourceLocation + fileSeperator + ScaClient.SCA_CONFIG_FOLDER_NAME;
+            if (!fs.existsSync(destDir)) {
+                fs.mkdirSync(destDir);
+            }
+            //attaching file name with destdir for writing to destination
+            destDir=destDir+fileSeperator+filename;
+            let fileWritten;
+            if(!fs.existsSync(sourceFile)){
+                this.log.error("File is not present at mentioned location : "+sourceFile);
+                continue;
+            }else{
+                fileWritten = fs.createReadStream(sourceFile).pipe(fs.createWriteStream(destDir));
+                this.log.info("Config file (" + sourceFile + ") copied to directory: " + destDir);
+            }
         }
     }
 
@@ -310,9 +323,9 @@ export class ScaClient {
 
     private async sendStartScanRequest(sourceLocation: SourceLocationType, sourceUrl: string): Promise<any> {
         this.log.info("Sending a request to start scan.");
-        let ScanConfigValue;
+        let scanConfigValue:ScanConfiguration[]=[];
          if(this.config.isExploitable){
-            ScanConfigValue = this.getScanConfig();
+            scanConfigValue.push(await this.getScanConfig());
          }
         const request = {
             project: {
@@ -321,13 +334,13 @@ export class ScaClient {
                 handler: {
                     url: sourceUrl
                 },
-                config:ScanConfigValue
-            }
+            },
+            config:scanConfigValue
         };
         return await this.httpClient.postRequest(ScaClient.CREATE_SCAN, request);
     }
     private async  getScanConfig():Promise<ScanConfiguration>{
-        //fetch from configuration
+        //fetching from configuration
         const sastProId:string=this.config.sastProjectId;
         const sastSerUrl:string=this.config.sastServerUrl;
         const sastUser:string=this.config.sastUsername;
@@ -341,13 +354,10 @@ export class ScaClient {
         scavalue.sastProjectId=sastProId;
         scavalue.environmentVariables=JSON.stringify(Array.from(ourMap.entries()));
         scavalue.sastServerUrl=sastSerUrl;
-        let ConfigValue:ScanConfigValue;
-        ConfigValue=scavalue;
-        const configValue:ScanConfiguration=new ScanConfiguration;
-        configValue.scanConfigValue=ConfigValue;
-        configValue.type='sca';
-
-        return configValue;
+        const valueConfiguration:ScanConfiguration=new ScanConfiguration;
+        valueConfiguration.scanConfigValue=scavalue;
+        valueConfiguration.type='sca';
+        return valueConfiguration;
 
     }
     private extractScanIdFrom(response: any): string {

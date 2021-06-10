@@ -1,19 +1,11 @@
-export class ScaScanConfigValue {
+import { ScanConfigValue } from "./ScanConfigValue";
+
+export class ScaScanConfigValue implements ScanConfigValue {
     private _environmentVariables: string = '';
-
-    public get environmentVariables(): string {
-        return this._environmentVariables;
-    }
-    public set environmentVariables(value: string) {
-        this._environmentVariables = value;
-    }
-
     private _sastProjectId: string = '';
     private _sastServerUrl: string = '';
     private _sastUsername: string = '';
-    private _sastProjectName: string = '';
-    
-   
+
     public get sastProjectId(): string {
         return this._sastProjectId;
     }
@@ -47,5 +39,12 @@ export class ScaScanConfigValue {
     }
     public set sastProjectName(value: string) {
         this._sastProjectName = value;
+    }
+    
+    public get environmentVariables(): string {
+        return this._environmentVariables;
+    }
+    public set environmentVariables(value: string) {
+        this._environmentVariables = value;
     }
 }
