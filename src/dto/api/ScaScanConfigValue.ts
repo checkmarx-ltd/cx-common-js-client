@@ -5,7 +5,9 @@ export class ScaScanConfigValue implements ScanConfigValue {
     private _sastProjectId: string = '';
     private _sastServerUrl: string = '';
     private _sastUsername: string = '';
+    private _sastProjectName: string = '';
 
+   
     public get sastProjectId(): string {
         return this._sastProjectId;
     }

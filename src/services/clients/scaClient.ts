@@ -253,16 +253,17 @@ export class ScaClient {
 
     private async copyConfigFileToSourceDir(sourceLocation:string) {
         let arrayOfConfigFilePath = this.config.configFilePaths;
+        let format = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+/;
+        let replaceString=/^.*[\\\/]/;
         for (let index = 0; index < arrayOfConfigFilePath.length; index++) {
             let sourceFile = arrayOfConfigFilePath[index];
             let fileSeperator = path.sep;
             //extracting filename from source file to to destination path
-            let format = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+/;
             if(!(format.test(sourceFile))){
                 sourceFile=sourceLocation+fileSeperator+sourceFile;
             }
             //extracting filename from source file
-            let filename = sourceFile.replace(/^.*[\\\/]/, '');
+            let filename = sourceFile.replace(replaceString, '');
             let destDir = sourceLocation + fileSeperator + ScaClient.SCA_CONFIG_FOLDER_NAME;
             if (!fs.existsSync(destDir)) {
                 fs.mkdirSync(destDir);
@@ -271,7 +272,7 @@ export class ScaClient {
             destDir=destDir+fileSeperator+filename;
             let fileWritten;
             if(!fs.existsSync(sourceFile)){
-                this.log.error("File is not present at mentioned location : "+sourceFile);
+                this.log.error("File is not present at location : "+sourceFile);
                 continue;
             }else{
                 fileWritten = fs.createReadStream(sourceFile).pipe(fs.createWriteStream(destDir));
@@ -324,9 +325,9 @@ export class ScaClient {
     private async sendStartScanRequest(sourceLocation: SourceLocationType, sourceUrl: string): Promise<any> {
         this.log.info("Sending a request to start scan.");
         let scanConfigValue:ScanConfiguration[]=[];
-         if(this.config.isExploitable){
-            scanConfigValue.push(await this.getScanConfig());
-         }
+       if(this.config.isExploitable){
+        scanConfigValue.push(await this.getScanConfig());
+       }
         const request = {
             project: {
                 id: this.projectId,
@@ -347,15 +348,15 @@ export class ScaClient {
         const sastPass:string=this.config.sastPassword;
         const sastProject:string=this.config.sastProjectName;
         const ourMap: Map<string, string> = this.config.envVariables;
-        const scavalue:ScaScanConfigValue=new ScaScanConfigValue;
-        scavalue.sastProjectName=sastProject;
-        scavalue.sastPassword=sastPass;
-        scavalue.sastUsername=sastUser;
-        scavalue.sastProjectId=sastProId;
-        scavalue.environmentVariables=JSON.stringify(Array.from(ourMap.entries()));
-        scavalue.sastServerUrl=sastSerUrl;
+        let scaValue:ScaScanConfigValue=new ScaScanConfigValue;
+        scaValue.sastProjectName=sastProject;
+        scaValue.sastPassword=sastPass;
+        scaValue.sastUsername=sastUser;
+        scaValue.sastProjectId=sastProId;
+        scaValue.environmentVariables=JSON.stringify(Array.from(ourMap.entries()));
+        scaValue.sastServerUrl=sastSerUrl;
         const valueConfiguration:ScanConfiguration=new ScanConfiguration;
-        valueConfiguration.scanConfigValue=scavalue;
+        valueConfiguration.scanConfigValue=scaValue;
         valueConfiguration.type='sca';
         return valueConfiguration;
 
