@@ -239,7 +239,6 @@ export class ScaClient {
         if (zipResult.fileCount === 0) {
             throw new TaskSkippedError('Zip file is empty: no source to scan');
         }
-
         if (!Boolean(this.config.includeSource) && this.config.fingerprintsFilePath) {
             this.log.debug(`Saving fingerprint file at: ${this.config.fingerprintsFilePath}${path.sep}${ScaClient.DEFAULT_FINGERPRINT_FILENAME}`);
             FileIO.moveFile(fingerprintsFilePath, `${this.config.fingerprintsFilePath}${path.sep}${ScaClient.DEFAULT_FINGERPRINT_FILENAME}`);
@@ -248,13 +247,16 @@ export class ScaClient {
         this.log.info('Uploading the zipped data...');
         const uploadedArchiveUrl: string = await this.getSourceUploadUrl();
         await this.uploadToAWS(uploadedArchiveUrl, tempFilename);
+        await this.deleteZip(tempFilename);
         return await this.sendStartScanRequest(SourceLocationType.LOCAL_DIRECTORY, uploadedArchiveUrl);
     }
 
     private async copyConfigFileToSourceDir(sourceLocation:string) {
+
         let arrayOfConfigFilePath = this.config.configFilePaths;
-        let format = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+/;
+        let format = /[!@#$%^&*()+\-=\[\]{};':"\\|,<>\/?]+/;
         let replaceString=/^.*[\\\/]/;
+        if(this.config.configFilePaths){
         for (let index = 0; index < arrayOfConfigFilePath.length; index++) {
             let sourceFile = arrayOfConfigFilePath[index];
             let fileSeperator = path.sep;
@@ -279,6 +281,15 @@ export class ScaClient {
                 this.log.info("Config file (" + sourceFile + ") copied to directory: " + destDir);
             }
         }
+        }
+    }
+    private async deleteZip(fileToDelete:string){
+        if(fs.existsSync(fileToDelete)){
+            fs.unlinkSync(fileToDelete);
+        }else{
+            this.log.error("File from $ {fileToDelete} can not deleted. ");
+        }
+
     }
 
     private async createScanFingerprintsFile(fingerprintsFileFilter: FilePathFilter[]): Promise<string> {
@@ -396,6 +407,10 @@ The Build Failed for the Following Reasons:
             mediumResults: scaReportResults.mediumVulnerability,
             lowResults: scaReportResults.lowVulnerability
         };
+        result.highResults=scaReportResults.highVulnerability;
+        result.mediumResults=scaReportResults.mediumVulnerability;
+        result.lowResults=scaReportResults.lowVulnerability;
+        
         const evaluator = new ScaSummaryEvaluator(this.config);
         const summary = evaluator.getScanSummary(vulResults, scaResults);
 
@@ -425,7 +440,7 @@ The Build Failed for the Following Reasons:
 
     private async printPolicyEvaluation(policy: PolicyEvaluation[], isPolicyViolationEnabled: boolean) {
         if (isPolicyViolationEnabled && policy) {
-            this.log.info("==============================================================================");
+            this.log.info("----------------CxSCA Policy Evaluation Results------------");
             for (let index = 0; index < policy.length; index++) {
                 let rules: PolicyRule[] = [];
                 const pol = policy[index];
@@ -436,7 +451,7 @@ The Build Failed for the Following Reasons:
                     this.log.info("     Rule name: " + value.name + " | Violated: " + value.isViolated);
                 });
             }
-            this.log.info("==============================================================================");
+            this.log.info("-----------------------------------------------------------");
         }
     }
 

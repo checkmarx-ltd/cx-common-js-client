@@ -19,6 +19,7 @@ import { ScaClient } from "./scaClient";
 import { SastConfig } from '../../dto/sastConfig';
 import { ScaConfig } from '../../dto/sca/scaConfig';
 import { ScanWithSettingsResponse } from "../../dto/api/scanWithSettingsResponse";
+const fs = require('fs');
 
 /**
  * High-level CX API client that uses specialized clients internally.
@@ -226,8 +227,17 @@ export class CxClient {
         await this.httpClient.postMultipartRequest(urlPath,
             { id: this.projectId },
             { zippedSource: tempFilename });
+            await this.deleteZip(tempFilename);
     }
 
+    private async deleteZip(fileToDelete:string){
+        if(fs.existsSync(fileToDelete)){
+            fs.unlinkSync(fileToDelete);
+        }else{
+            this.log.error("File from $ {fileToDelete} can not deleted. ");
+        }
+
+    }
     private async zipContent() {
         const tempFilename = tmpNameSync({ prefix: 'cxsrc-', postfix: '.zip' });
         this.log.debug(`Zipping source code at ${this.config.sourceLocation} into file ${tempFilename}`);
