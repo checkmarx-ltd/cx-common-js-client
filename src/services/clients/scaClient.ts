@@ -12,7 +12,7 @@ import { Package } from "../../dto/sca/report/package";
 import { ScanResults } from '../../dto/scanResults';
 import { SCAWaiter } from '../scaWaiter';
 import { SourceLocationType } from '../../dto/sca/sourceLocationType';
-import { file, tmpName,tmpNameSync } from "tmp";
+import { file, tmpName, tmpNameSync } from "tmp";
 import { FilePathFilter } from "../filePathFilter";
 import Zipper from "../zipper";
 import FileIO from '../fileIO';
@@ -151,14 +151,14 @@ export class ScaClient {
 
     private async createProject(projectName: string): Promise<any> {
         const teamName = this.config.scaSastTeam;
-        if(!teamName || teamName=='/'){
+        if (!teamName || teamName == '/') {
             this.log.error("Team name for Cx SCA is not specified. ");
         }
-        let teamNameArray: Array<string|undefined> = [teamName];
-            const request = {
+        let teamNameArray: Array<string | undefined> = [teamName];
+        const request = {
             name: projectName,
-            AssignedTeams:teamNameArray
-        }; 
+            AssignedTeams: teamNameArray
+        };
         const newProject = await this.httpClient.postRequest(ScaClient.PROJECTS, request);
         return newProject.id;
     }
@@ -206,9 +206,9 @@ export class ScaClient {
         let filePathFiltersAnd: FilePathFilter[] = [new FilePathFilter(this.config.dependencyFileExtension, this.config.dependencyFolderExclusion)];
         let filePathFiltersOr: FilePathFilter[] = [];
         let fingerprintsFilePath = '';
-        
-        if(this.config.configFilePaths){
-        await this.copyConfigFileToSourceDir(this.sourceLocation);
+
+        if (this.config.configFilePaths) {
+            await this.copyConfigFileToSourceDir(this.sourceLocation);
         }
         if (!Boolean(this.config.includeSource)) {
             this.log.info("Using manifest and fingerprint flow.");
@@ -232,7 +232,7 @@ export class ScaClient {
         }
 
         const zipper = new Zipper(this.log, filePathFiltersAnd, filePathFiltersOr);
-        
+
         this.log.debug(`Zipping code from ${this.sourceLocation}, ${fingerprintsFilePath} into file ${tempFilename}`);
         const zipResult = await zipper.zipDirectory(this.sourceLocation, tempFilename, fingerprintsFilePath);
 
@@ -251,43 +251,47 @@ export class ScaClient {
         return await this.sendStartScanRequest(SourceLocationType.LOCAL_DIRECTORY, uploadedArchiveUrl);
     }
 
-    private async copyConfigFileToSourceDir(sourceLocation:string) {
-
+    private async copyConfigFileToSourceDir(sourceLocation: string) {
         let arrayOfConfigFilePath = this.config.configFilePaths;
         let format = /[!@#$%^&*()+\-=\[\]{};':"\\|,<>\/?]+/;
-        let replaceString=/^.*[\\\/]/;
-        if(this.config.configFilePaths){
-        for (let index = 0; index < arrayOfConfigFilePath.length; index++) {
-            let sourceFile = arrayOfConfigFilePath[index];
-            let fileSeperator = path.sep;
-            //extracting filename from source file to to destination path
-            if(!(format.test(sourceFile))){
-                sourceFile=sourceLocation+fileSeperator+sourceFile;
+        let replaceString = /^.*[\\\/]/;
+        if (this.config.configFilePaths) {
+            for (let index = 0; index < arrayOfConfigFilePath.length; index++) {
+                let sourceFile = arrayOfConfigFilePath[index].trim();
+                if (sourceFile != "" && sourceFile) {
+                    let fileSeperator = path.sep;
+                    //extracting filename from source file to to destination path
+                    if (!(format.test(sourceFile))) {
+                        sourceFile = sourceLocation + fileSeperator + sourceFile;
+                    }
+                    //extracting filename from source file
+                    let filename = sourceFile.replace(replaceString, '');
+                    let destDir = sourceLocation + fileSeperator + ScaClient.SCA_CONFIG_FOLDER_NAME;
+                    if (!fs.existsSync(destDir)) {
+                        fs.mkdirSync(destDir);
+                    }
+                    //attaching file name with destdir for writing to destination
+                    destDir = destDir + fileSeperator + filename;
+                    let fileWritten;
+                    if (!fs.existsSync(sourceFile)) {
+                        this.log.error("File is not present at location : " + sourceFile);
+                        continue;
+                    } else {
+                        fileWritten = fs.createReadStream(sourceFile).pipe(fs.createWriteStream(destDir));
+                        this.log.info("Config file (" + sourceFile + ") copied to directory: " + destDir);
+                    }
+                }else{
+                    this.log.error("File is not present at location : " + sourceFile);
+                }
             }
-            //extracting filename from source file
-            let filename = sourceFile.replace(replaceString, '');
-            let destDir = sourceLocation + fileSeperator + ScaClient.SCA_CONFIG_FOLDER_NAME;
-            if (!fs.existsSync(destDir)) {
-                fs.mkdirSync(destDir);
-            }
-            //attaching file name with destdir for writing to destination
-            destDir=destDir+fileSeperator+filename;
-            let fileWritten;
-            if(!fs.existsSync(sourceFile)){
-                this.log.error("File is not present at location : "+sourceFile);
-                continue;
-            }else{
-                fileWritten = fs.createReadStream(sourceFile).pipe(fs.createWriteStream(destDir));
-                this.log.info("Config file (" + sourceFile + ") copied to directory: " + destDir);
-            }
-        }
         }
     }
-    private async deleteZip(fileToDelete:string){
-        if(fs.existsSync(fileToDelete)){
+
+    private async deleteZip(fileToDelete: string) {
+        if (fs.existsSync(fileToDelete)) {
             fs.unlinkSync(fileToDelete);
-        }else{
-            this.log.error("File from $ {fileToDelete} can not deleted. ");
+        } else {
+            this.log.error("File from ${fileToDelete} can not deleted. ");
         }
 
     }
@@ -335,10 +339,10 @@ export class ScaClient {
 
     private async sendStartScanRequest(sourceLocation: SourceLocationType, sourceUrl: string): Promise<any> {
         this.log.info("Sending a request to start scan.");
-        let scanConfigValue:ScanConfiguration[]=[];
-       if(this.config.isExploitable){
-        scanConfigValue.push(await this.getScanConfig());
-       }
+        let scanConfigValue: ScanConfiguration[] = [];
+        if (this.config.isExploitable) {
+            scanConfigValue.push(await this.getScanConfig());
+        }
         const request = {
             project: {
                 id: this.projectId,
@@ -347,28 +351,28 @@ export class ScaClient {
                     url: sourceUrl
                 },
             },
-            config:scanConfigValue
+            config: scanConfigValue
         };
         return await this.httpClient.postRequest(ScaClient.CREATE_SCAN, request);
     }
-    private async  getScanConfig():Promise<ScanConfiguration>{
+    private async getScanConfig(): Promise<ScanConfiguration> {
         //fetching from configuration
-        const sastProId:string=this.config.sastProjectId;
-        const sastSerUrl:string=this.config.sastServerUrl;
-        const sastUser:string=this.config.sastUsername;
-        const sastPass:string=this.config.sastPassword;
-        const sastProject:string=this.config.sastProjectName;
+        const sastProId: string = this.config.sastProjectId;
+        const sastSerUrl: string = this.config.sastServerUrl;
+        const sastUser: string = this.config.sastUsername;
+        const sastPass: string = this.config.sastPassword;
+        const sastProject: string = this.config.sastProjectName;
         const ourMap: Map<string, string> = this.config.envVariables;
-        let scaValue:ScaScanConfigValue=new ScaScanConfigValue;
-        scaValue.sastProjectName=sastProject;
-        scaValue.sastPassword=sastPass;
-        scaValue.sastUsername=sastUser;
-        scaValue.sastProjectId=sastProId;
-        scaValue.environmentVariables=JSON.stringify(Array.from(ourMap.entries()));
-        scaValue.sastServerUrl=sastSerUrl;
-        const valueConfiguration:ScanConfiguration=new ScanConfiguration;
-        valueConfiguration.scanConfigValue=scaValue;
-        valueConfiguration.type='sca';
+        let scaValue: ScaScanConfigValue = new ScaScanConfigValue(sastSerUrl, sastUser, sastPass, sastProject, sastProId, JSON.stringify(Array.from(ourMap.entries())));
+        scaValue.sastProjectName = sastProject;
+        scaValue.sastPassword = sastPass;
+        scaValue.sastUsername = sastUser;
+        scaValue.sastProjectId = sastProId;
+        scaValue.environmentVariables = JSON.stringify(Array.from(ourMap.entries()));
+        scaValue.sastServerUrl = sastSerUrl;
+        const valueConfiguration: ScanConfiguration = new ScanConfiguration;
+        valueConfiguration.scanConfigValue = scaValue;
+        valueConfiguration.type = 'sca';
         return valueConfiguration;
 
     }
@@ -407,10 +411,7 @@ The Build Failed for the Following Reasons:
             mediumResults: scaReportResults.mediumVulnerability,
             lowResults: scaReportResults.lowVulnerability
         };
-        result.highResults=scaReportResults.highVulnerability;
-        result.mediumResults=scaReportResults.mediumVulnerability;
-        result.lowResults=scaReportResults.lowVulnerability;
-        
+
         const evaluator = new ScaSummaryEvaluator(this.config);
         const summary = evaluator.getScanSummary(vulResults, scaResults);
 
@@ -424,11 +425,15 @@ The Build Failed for the Following Reasons:
     private async determinePolicyViolation(scaResults: SCAResults) {
         const PolicyEvaluation = scaResults.scaPolicyViolation;
         if (PolicyEvaluation) {
+
             for (const index in PolicyEvaluation) {
-                if (PolicyEvaluation[index].actions.breakBuild) {
-                    scaResults.scaPolicies.push(PolicyEvaluation[index].name);
+                if (PolicyEvaluation[index].isViolated) {
+                    if (PolicyEvaluation[index].actions.breakBuild) {
+                        scaResults.scaPolicies.push(PolicyEvaluation[index].name);
+                    }
                 }
             }
+
         }
     }
 
@@ -444,7 +449,7 @@ The Build Failed for the Following Reasons:
             for (let index = 0; index < policy.length; index++) {
                 let rules: PolicyRule[] = [];
                 const pol = policy[index];
-               
+
                 this.log.info("  Policy name: " + pol.name + " | Violated:" + pol.isViolated + " | Policy Description: " + pol.description);
                 rules = pol.rules;
                 rules.forEach((value) => {

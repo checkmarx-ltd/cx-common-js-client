@@ -205,9 +205,8 @@ export class CxClient {
 
     private async scanWithSetting(): Promise<ScanWithSettingsResponse> {
         const tempFilename = await this.zipContent();
-
         this.log.info(`Uploading the zipped source code.`);
-        return this.httpClient.postMultipartRequest('sast/scanWithSettings',
+            const scanResponse: ScanWithSettingsResponse = await this.httpClient.postMultipartRequest('sast/scanWithSettings',
             {
                 projectId: this.projectId,
                 overrideProjectSetting: this.isNewProject,
@@ -218,6 +217,8 @@ export class CxClient {
                 comment: this.sastConfig.comment
             },
             { zippedSource: tempFilename });
+            await this.deleteZip(tempFilename);
+            return scanResponse;
     }
 
     private async uploadSourceCode(): Promise<void> {
@@ -227,7 +228,7 @@ export class CxClient {
         await this.httpClient.postMultipartRequest(urlPath,
             { id: this.projectId },
             { zippedSource: tempFilename });
-            await this.deleteZip(tempFilename);
+        await this.deleteZip(tempFilename);
     }
 
     private async deleteZip(fileToDelete:string){
