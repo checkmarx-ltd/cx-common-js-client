@@ -339,10 +339,6 @@ export class ScaClient {
 
     private async sendStartScanRequest(sourceLocation: SourceLocationType, sourceUrl: string): Promise<any> {
         this.log.info("Sending a request to start scan.");
-        let scanConfigValue: ScanConfiguration[] = [];
-        if (this.config.isExploitable) {
-            scanConfigValue.push(await this.getScanConfig());
-        }
         const request = {
             project: {
                 id: this.projectId,
@@ -351,31 +347,22 @@ export class ScaClient {
                     url: sourceUrl
                 },
             },
-            config: scanConfigValue
+            config: [{
+                type:'sca',
+                value: {
+                    "sastProjectId":this.config.sastProjectId,
+                    "sastServerUrl": this.config.sastServerUrl,
+                    "sastUsername": this.config.sastUsername,
+                    "sastPassword": this.config.sastPassword,
+                    "sastProjectName": this.config.sastProjectName,
+                    "environmentVariables": JSON.stringify(Array.from(this.config.envVariables)),
+                }
+            }
+            ]
         };
         return await this.httpClient.postRequest(ScaClient.CREATE_SCAN, request);
     }
-    private async getScanConfig(): Promise<ScanConfiguration> {
-        //fetching from configuration
-        const sastProId: string = this.config.sastProjectId;
-        const sastSerUrl: string = this.config.sastServerUrl;
-        const sastUser: string = this.config.sastUsername;
-        const sastPass: string = this.config.sastPassword;
-        const sastProject: string = this.config.sastProjectName;
-        const ourMap: Map<string, string> = this.config.envVariables;
-        let scaValue: ScaScanConfigValue = new ScaScanConfigValue(sastSerUrl, sastUser, sastPass, sastProject, sastProId, JSON.stringify(Array.from(ourMap.entries())));
-        scaValue.sastProjectName = sastProject;
-        scaValue.sastPassword = sastPass;
-        scaValue.sastUsername = sastUser;
-        scaValue.sastProjectId = sastProId;
-        scaValue.environmentVariables = JSON.stringify(Array.from(ourMap.entries()));
-        scaValue.sastServerUrl = sastSerUrl;
-        const valueConfiguration: ScanConfiguration = new ScanConfiguration;
-        valueConfiguration.scanConfigValue = scaValue;
-        valueConfiguration.type = 'sca';
-        return valueConfiguration;
-
-    }
+  
     private extractScanIdFrom(response: any): string {
         if (response && response["id"]) {
             return response["id"];
