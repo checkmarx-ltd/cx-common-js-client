@@ -33,9 +33,7 @@ import { report } from "superagent";
 import { PolicyEvaluation } from "../../dto/api/PolicyEvaluation";
 import { PolicyAction } from "../../dto/api/PolicyAction";
 import { PolicyRule } from "../../dto/api/PolicyRule";
-import { ScanConfiguration } from "../../dto/api/ScanConfiguration";
-import { ScanConfigValue } from "../../dto/api/ScanConfigValue";
-import { ScaScanConfigValue } from "../../dto/api/ScaScanConfigValue";
+
 import { config } from "process";
 import { SastClient } from "./sastClient";
 const fs = require('fs');
