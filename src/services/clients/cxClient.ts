@@ -139,11 +139,9 @@ export class CxClient {
             await this.uploadSourceCode();
             scanResult.scanId = await this.sastClient.createScan(this.projectId);
         }
-
-        this.log.debug('scan id ' + scanResult.scanId);
-
         const projectStateUrl = url.resolve(this.sastConfig.serverUrl, `CxWebClient/portal#/projectState/${this.projectId}/Summary`);
         this.log.info(`SAST scan created successfully. CxLink to project state: ${projectStateUrl}`);
+        this.log.info('Scan id ' + scanResult.scanId);
 
         return scanResult;
     }
@@ -198,6 +196,7 @@ export class CxClient {
             }
 
             projectId = await this.createNewProject();
+            this.log.debug(`Project created. ID: ${projectId}`);
         }
 
         return projectId;
