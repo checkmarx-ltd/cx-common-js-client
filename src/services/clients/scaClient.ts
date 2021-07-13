@@ -190,9 +190,19 @@ export class ScaClient {
         return await this.sendStartScanRequest(SourceLocationType.REMOTE_REPOSITORY, repoInfo.url);
     }
 
-    private async getSourceUploadUrl(): Promise<string> {
-        this.config.includeSource
-        const response: any = await this.httpClient.postRequest(ScaClient.ZIP_UPLOAD, {});
+    private async getSourceUploadUrl(): Promise<string> {    
+        const request = {
+            config: [
+                {
+                type:'sca',
+                value: {
+                          "includeSourceCode":this.config.includeSource
+                       }
+                }
+            ]
+        };
+
+        const response: any = await this.httpClient.postRequest(ScaClient.ZIP_UPLOAD, request);
         if (!response || !response["url"]) {
             throw Error("Unable to get the upload URL.");
         }
