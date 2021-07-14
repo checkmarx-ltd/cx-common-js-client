@@ -11,6 +11,7 @@ export interface ScanConfig {
     enableDependencyScan: boolean;
     enableProxy: boolean;
     cxOrigin: string;
+    cxOriginUrl:string;
     sastConfig?: SastConfig;
     scaConfig?: ScaConfig;
     proxyConfig?: ProxyConfig;

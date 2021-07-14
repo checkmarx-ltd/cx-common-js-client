@@ -1,6 +1,7 @@
 import { ScaSummaryResults } from "./report/scaSummaryResults";
 import { Finding } from './report/finding';
 import { Package } from './report/package';
+import { PolicyEvaluation } from "../api/PolicyEvaluation";
 
 export class SCAResults {
     private _scanId: string = '';
@@ -9,7 +10,26 @@ export class SCAResults {
     private _findings: Finding[] = [];
     private _packages: Package[] = [];
     private _scaResultReady: boolean = false;
+    private _scaPolicyViolation: PolicyEvaluation[] = [];
+    private _scaPolicies: string[] = [];
+    
+    public get scaPolicies(): string[] {
+        return this._scaPolicies;
+    }
+    public set scaPolicies(value: string[]) {
+        this._scaPolicies = value;
+    }
 
+  
+
+    public get scaPolicyViolation(): PolicyEvaluation[] {
+        return this._scaPolicyViolation;
+    }
+    public set scaPolicyViolation(value: PolicyEvaluation[]) {
+        this._scaPolicyViolation = value;
+    }
+
+    
     public get scanId(): string {
         return this._scanId;
     }

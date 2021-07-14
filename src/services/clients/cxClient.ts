@@ -19,6 +19,7 @@ import { ScaClient } from "./scaClient";
 import { SastConfig } from '../../dto/sastConfig';
 import { ScaConfig } from '../../dto/sca/scaConfig';
 import { ScanWithSettingsResponse } from "../../dto/api/scanWithSettingsResponse";
+const fs = require('fs');
 
 /**
  * High-level CX API client that uses specialized clients internally.
@@ -91,9 +92,9 @@ export class CxClient {
 
         if (!httpClient) {
             if (this.config.enableProxy && this.config.proxyConfig && (this.proxyConfig.proxyHost != '' || this.proxyConfig.proxyUrl != '')) {
-                this.httpClient = new HttpClient(baseUrl, this.config.cxOrigin, this.log, this.proxyConfig);
+                this.httpClient = new HttpClient(baseUrl, this.config.cxOrigin, this.config.cxOriginUrl,this.log, this.proxyConfig);
             } else {
-                this.httpClient = new HttpClient(baseUrl, this.config.cxOrigin, this.log);
+                this.httpClient = new HttpClient(baseUrl, this.config.cxOrigin, this.config.cxOriginUrl,this.log);
             }
             await this.httpClient.getPacProxyResolve();
             await this.httpClient.login(this.sastConfig.username, this.sastConfig.password);
@@ -113,9 +114,9 @@ export class CxClient {
     private async initScaClient() {
         let scaHttpClient: HttpClient;
         if (this.config.enableProxy && this.config.proxyConfig && (this.proxyConfig.proxyHost != '' || this.proxyConfig.proxyUrl != '')) {
-            scaHttpClient = new HttpClient(this.scaConfig.apiUrl, this.config.cxOrigin, this.log, this.proxyConfig);
+            scaHttpClient = new HttpClient(this.scaConfig.apiUrl, this.config.cxOrigin, this.config.cxOriginUrl,this.log, this.proxyConfig);
         } else {
-            scaHttpClient = new HttpClient(this.scaConfig.apiUrl, this.config.cxOrigin, this.log);
+            scaHttpClient = new HttpClient(this.scaConfig.apiUrl, this.config.cxOrigin, this.config.cxOriginUrl,this.log);
         }
 
         this.scaClient = new ScaClient(this.scaConfig, this.config.sourceLocation, scaHttpClient, this.log, this.config);
@@ -138,11 +139,9 @@ export class CxClient {
             await this.uploadSourceCode();
             scanResult.scanId = await this.sastClient.createScan(this.projectId);
         }
-
-        this.log.debug('scan id ' + scanResult.scanId);
-
         const projectStateUrl = url.resolve(this.sastConfig.serverUrl, `CxWebClient/portal#/projectState/${this.projectId}/Summary`);
         this.log.info(`SAST scan created successfully. CxLink to project state: ${projectStateUrl}`);
+        this.log.info('Scan id ' + scanResult.scanId);
 
         return scanResult;
     }
@@ -197,6 +196,7 @@ export class CxClient {
             }
 
             projectId = await this.createNewProject();
+            this.log.debug(`Project created. ID: ${projectId}`);
         }
 
         return projectId;
@@ -204,9 +204,8 @@ export class CxClient {
 
     private async scanWithSetting(): Promise<ScanWithSettingsResponse> {
         const tempFilename = await this.zipContent();
-
         this.log.info(`Uploading the zipped source code.`);
-        return this.httpClient.postMultipartRequest('sast/scanWithSettings',
+            const scanResponse: ScanWithSettingsResponse = await this.httpClient.postMultipartRequest('sast/scanWithSettings',
             {
                 projectId: this.projectId,
                 overrideProjectSetting: this.isNewProject,
@@ -217,6 +216,8 @@ export class CxClient {
                 comment: this.sastConfig.comment
             },
             { zippedSource: tempFilename });
+            await this.deleteZip(tempFilename);
+            return scanResponse;
     }
 
     private async uploadSourceCode(): Promise<void> {
@@ -226,8 +227,17 @@ export class CxClient {
         await this.httpClient.postMultipartRequest(urlPath,
             { id: this.projectId },
             { zippedSource: tempFilename });
+        await this.deleteZip(tempFilename);
     }
 
+    private async deleteZip(fileToDelete:string){
+        if(fs.existsSync(fileToDelete)){
+            fs.unlinkSync(fileToDelete);
+        }else{
+            this.log.error("File from $ {fileToDelete} can not deleted. ");
+        }
+
+    }
     private async zipContent() {
         const tempFilename = tmpNameSync({ prefix: 'cxsrc-', postfix: '.zip' });
         this.log.debug(`Zipping source code at ${this.config.sourceLocation} into file ${tempFilename}`);
@@ -293,14 +303,12 @@ export class CxClient {
         if (!this.sastConfig.enablePolicyViolations) {
             return;
         }
-
         if (!this.isPolicyEnforcementSupported) {
             this.log.warning('Policy enforcement is not supported by the current Checkmarx server version.');
             return;
         }
 
         await this.armClient.waitForArmToFinish(this.projectId);
-
         const projectViolations = await this.armClient.getProjectViolations(this.projectId, 'SAST');
         for (const policy of projectViolations) {
             result.sastPolicies.push(policy.policyName);

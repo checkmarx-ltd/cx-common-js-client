@@ -1,7 +1,7 @@
 import parseMilliseconds = require("parse-ms");
 
 export class Stopwatch {
-    private lastOperationStart: Date = new Date(0);
+    private lastOperationStart: Date = new Date();
 
     start() {
         this.lastOperationStart = new Date();

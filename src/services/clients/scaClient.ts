@@ -1,4 +1,4 @@
-import {Logger, ScaConfig, ScanConfig} from "../..";
+import { Logger, PollingSettings, SastConfig, ScaConfig, ScanConfig, Waiter } from "../..";
 import { HttpClient } from "./httpClient";
 import { Stopwatch } from "../stopwatch";
 import { ScaLoginSettings } from "../../dto/sca/scaLoginSettings";
@@ -12,7 +12,7 @@ import { Package } from "../../dto/sca/report/package";
 import { ScanResults } from '../../dto/scanResults';
 import { SCAWaiter } from '../scaWaiter';
 import { SourceLocationType } from '../../dto/sca/sourceLocationType';
-import { tmpNameSync } from "tmp";
+import { file, tmpName, tmpNameSync } from "tmp";
 import { FilePathFilter } from "../filePathFilter";
 import Zipper from "../zipper";
 import FileIO from '../fileIO';
@@ -26,8 +26,18 @@ import { ScanSummary } from "../../dto/scanSummary";
 import { ScaFingerprintCollector } from '../../dto/sca/scaFingerprintCollector';
 import * as path from "path";
 import ClientTypeResolver from "../clientTypeResolver";
+import { ScanProvider } from "../../dto/api/scanProvider";
+import { PolicyViolationGroup } from "../../dto/api/policyViolationGroup";
+import { ArmStatus } from "../../dto/api/armStatus";
+import { report } from "superagent";
+import { PolicyEvaluation } from "../../dto/api/PolicyEvaluation";
+import { PolicyAction } from "../../dto/api/PolicyAction";
+import { PolicyRule } from "../../dto/api/PolicyRule";
 
-/**
+import { config } from "process";
+import { SastClient } from "./sastClient";
+const fs = require('fs');
+;/**
  * SCA - Software Composition Analysis - is the successor of OSA.
  */
 export class ScaClient {
@@ -40,6 +50,8 @@ export class ScaClient {
     private static readonly REPORT_ID: string = ScaClient.RISK_MANAGEMENT_API + "scans/%s/riskReportId";
 
     private static readonly ZIP_UPLOAD: string = "/api/uploads";
+    private static readonly SCA_CONFIG_FOLDER_NAME: string = ".cxsca.configurations";
+
     private static readonly CREATE_SCAN: string = "/api/scans";
     private static readonly GET_SCAN: string = "/api/scans/%s";
     private static readonly WEB_REPORT: string = "/#/projects/%s/reports/%s";
@@ -54,12 +66,15 @@ export class ScaClient {
     private scanId: string = '';
 
     private readonly stopwatch = new Stopwatch();
-
+    private static readonly pollingSettings: PollingSettings = {
+        intervalSeconds: 10,
+        masterTimeoutMinutes: 20
+    };
     constructor(private readonly config: ScaConfig,
         private readonly sourceLocation: string,
         private readonly httpClient: HttpClient,
         private readonly log: Logger,
-        private readonly scanConfig:ScanConfig) {
+        private readonly scanConfig: ScanConfig) {
     }
 
     private async resolveScaLoginSettings(scaConfig: ScaConfig): Promise<ScaLoginSettings> {
@@ -133,8 +148,14 @@ export class ScaClient {
     }
 
     private async createProject(projectName: string): Promise<any> {
+        const teamName = this.config.scaSastTeam;
+        if (!teamName || teamName == '/') {
+            this.log.error("Team name for Cx SCA is not specified. ");
+        }
+        let teamNameArray: Array<string | undefined> = [teamName];
         const request = {
-            name: projectName
+            name: projectName,
+            AssignedTeams: teamNameArray
         };
         const newProject = await this.httpClient.postRequest(ScaClient.PROJECTS, request);
         return newProject.id;
@@ -150,6 +171,8 @@ export class ScaClient {
             } else {
                 response = await this.submitSourceFromLocalDir();
             }
+
+
             this.scanId = this.extractScanIdFrom(response);
             this.stopwatch.start();
             this.log.info("Scan started successfully. Scan ID: " + this.scanId);
@@ -167,8 +190,19 @@ export class ScaClient {
         return await this.sendStartScanRequest(SourceLocationType.REMOTE_REPOSITORY, repoInfo.url);
     }
 
-    private async getSourceUploadUrl(): Promise<string> {
-        const response: any = await this.httpClient.postRequest(ScaClient.ZIP_UPLOAD, {});
+    private async getSourceUploadUrl(): Promise<string> {    
+        const request = {
+            config: [
+                {
+                type:'sca',
+                value: {
+                          "includeSourceCode":this.config.includeSource
+                       }
+                }
+            ]
+        };
+
+        const response: any = await this.httpClient.postRequest(ScaClient.ZIP_UPLOAD, request);
         if (!response || !response["url"]) {
             throw Error("Unable to get the upload URL.");
         }
@@ -181,6 +215,9 @@ export class ScaClient {
         let filePathFiltersOr: FilePathFilter[] = [];
         let fingerprintsFilePath = '';
 
+        if (this.config.configFilePaths) {
+            await this.copyConfigFileToSourceDir(this.sourceLocation);
+        }
         if (!Boolean(this.config.includeSource)) {
             this.log.info("Using manifest and fingerprint flow.");
             const projectResolvingConfiguration = await this.fetchProjectResolvingConfiguration();
@@ -210,7 +247,6 @@ export class ScaClient {
         if (zipResult.fileCount === 0) {
             throw new TaskSkippedError('Zip file is empty: no source to scan');
         }
-
         if (!Boolean(this.config.includeSource) && this.config.fingerprintsFilePath) {
             this.log.debug(`Saving fingerprint file at: ${this.config.fingerprintsFilePath}${path.sep}${ScaClient.DEFAULT_FINGERPRINT_FILENAME}`);
             FileIO.moveFile(fingerprintsFilePath, `${this.config.fingerprintsFilePath}${path.sep}${ScaClient.DEFAULT_FINGERPRINT_FILENAME}`);
@@ -219,7 +255,53 @@ export class ScaClient {
         this.log.info('Uploading the zipped data...');
         const uploadedArchiveUrl: string = await this.getSourceUploadUrl();
         await this.uploadToAWS(uploadedArchiveUrl, tempFilename);
+        await this.deleteZip(tempFilename);
         return await this.sendStartScanRequest(SourceLocationType.LOCAL_DIRECTORY, uploadedArchiveUrl);
+    }
+
+    private async copyConfigFileToSourceDir(sourceLocation: string) {
+        let arrayOfConfigFilePath = this.config.configFilePaths;
+        let format = /[!@#$%^&*()+\-=\[\]{};':"\\|,<>\/?]+/;
+        let replaceString = /^.*[\\\/]/;
+        if (this.config.configFilePaths) {
+            for (let index = 0; index < arrayOfConfigFilePath.length; index++) {
+                let sourceFile = arrayOfConfigFilePath[index].trim();
+                if (sourceFile != "" && sourceFile) {
+                    let fileSeperator = path.sep;
+                    //extracting filename from source file to to destination path
+                    if (!(format.test(sourceFile))) {
+                        sourceFile = sourceLocation + fileSeperator + sourceFile;
+                    }
+                    //extracting filename from source file
+                    let filename = sourceFile.replace(replaceString, '');
+                    let destDir = sourceLocation + fileSeperator + ScaClient.SCA_CONFIG_FOLDER_NAME;
+                    if (!fs.existsSync(destDir)) {
+                        fs.mkdirSync(destDir);
+                    }
+                    //attaching file name with destdir for writing to destination
+                    destDir = destDir + fileSeperator + filename;
+                    let fileWritten;
+                    if (!fs.existsSync(sourceFile)) {
+                        this.log.error("File is not present at location : " + sourceFile);
+                        continue;
+                    } else {
+                        fileWritten = fs.createReadStream(sourceFile).pipe(fs.createWriteStream(destDir));
+                        this.log.info("Config file (" + sourceFile + ") copied to directory: " + destDir);
+                    }
+                }else{
+                    this.log.error("File is not present at location : " + sourceFile);
+                }
+            }
+        }
+    }
+
+    private async deleteZip(fileToDelete: string) {
+        if (fs.existsSync(fileToDelete)) {
+            fs.unlinkSync(fileToDelete);
+        } else {
+            this.log.error("File from ${fileToDelete} can not deleted. ");
+        }
+
     }
 
     private async createScanFingerprintsFile(fingerprintsFileFilter: FilePathFilter[]): Promise<string> {
@@ -251,13 +333,13 @@ export class ScaClient {
         this.log.debug(`Sending PUT request to ${uploadUrl}`);
         const child_process = require('child_process');
         let command;
-        if(this.scanConfig.enableProxy && this.scanConfig.proxyConfig && this.scanConfig.proxyConfig.proxyHost!=''){
-            if(this.scanConfig.proxyConfig.proxyUser && this.scanConfig.proxyConfig.proxyPass){
+        if (this.scanConfig.enableProxy && this.scanConfig.proxyConfig && this.scanConfig.proxyConfig.proxyHost != '') {
+            if (this.scanConfig.proxyConfig.proxyUser && this.scanConfig.proxyConfig.proxyPass) {
                 command = `curl -U ${this.scanConfig.proxyConfig.proxyUser}:${this.scanConfig.proxyConfig.proxyPass} -x ${this.scanConfig.proxyConfig.proxyHost} -X PUT -L "${uploadUrl}" -H "Content-Type:" -T "${file}"`;
-            }else{
+            } else {
                 command = `curl -x ${this.scanConfig.proxyConfig.proxyHost} -X PUT -L "${uploadUrl}" -H "Content-Type:" -T "${file}"`;
             }
-        }else{
+        } else {
             command = `curl -X PUT -L "${uploadUrl}" -H "Content-Type:" -T "${file}"`;
         }
         child_process.execSync(command, { stdio: 'pipe' });
@@ -271,12 +353,24 @@ export class ScaClient {
                 type: sourceLocation,
                 handler: {
                     url: sourceUrl
+                },
+            },
+            config: [{
+                type:'sca',
+                value: {
+                    "sastProjectId":this.config.sastProjectId,
+                    "sastServerUrl": this.config.sastServerUrl,
+                    "sastUsername": this.config.sastUsername,
+                    "sastPassword": this.config.sastPassword,
+                    "sastProjectName": this.config.sastProjectName,
+                    "environmentVariables": JSON.stringify(Array.from(this.config.envVariables)),
                 }
             }
+            ]
         };
         return await this.httpClient.postRequest(ScaClient.CREATE_SCAN, request);
     }
-
+  
     private extractScanIdFrom(response: any): string {
         if (response && response["id"]) {
             return response["id"];
@@ -289,6 +383,7 @@ export class ScaClient {
             `********************************************
 The Build Failed for the Following Reasons:
 ********************************************`);
+        this.logPolicyCheckError(failure.policyCheck);
         if (failure.thresholdErrors.length) {
             this.log.error('Exceeded CxSCA Vulnerability Threshold.');
             for (const error of failure.thresholdErrors) {
@@ -303,20 +398,77 @@ The Build Failed for the Following Reasons:
         await waiter.waitForScanToFinish();
         const scaResults: SCAResults = await this.retrieveScanResults();
         const scaReportResults: ScaReportResults = new ScaReportResults(scaResults, this.config);
-
+        await this.addScaPolicyViolationsToScanResults(scaResults);
+        await this.printPolicyEvaluation(scaResults.scaPolicyViolation, this.config.scaEnablePolicyViolations);
+        await this.determinePolicyViolation(scaResults);
         const vulResults = {
             highResults: scaReportResults.highVulnerability,
             mediumResults: scaReportResults.mediumVulnerability,
             lowResults: scaReportResults.lowVulnerability
         };
+
         const evaluator = new ScaSummaryEvaluator(this.config);
-        const summary = evaluator.getScanSummary(vulResults);
-        if (summary.hasThresholdErrors()) {
+        const summary = evaluator.getScanSummary(vulResults, scaResults);
+
+        if (summary.hasErrors()) {
             result.buildFailed = true;
             this.logBuildFailure(summary);
         }
-
         result.scaResults = scaReportResults;
+    }
+
+    private async determinePolicyViolation(scaResults: SCAResults) {
+        const PolicyEvaluation = scaResults.scaPolicyViolation;
+        if (PolicyEvaluation) {
+
+            for (const index in PolicyEvaluation) {
+                if (PolicyEvaluation[index].isViolated) {
+                    if (PolicyEvaluation[index].actions.breakBuild) {
+                        scaResults.scaPolicies.push(PolicyEvaluation[index].name);
+                    }
+                }
+            }
+
+        }
+    }
+
+    private logPolicyCheckError(policyCheck: { violatedPolicyNames: string[] }) {
+        if (policyCheck.violatedPolicyNames.length) {
+            this.log.error('Project policy status: violated');
+        }
+    }
+
+    private async printPolicyEvaluation(policy: PolicyEvaluation[], isPolicyViolationEnabled: boolean) {
+        if (isPolicyViolationEnabled && policy) {
+            this.log.info("----------------CxSCA Policy Evaluation Results------------");
+            for (let index = 0; index < policy.length; index++) {
+                let rules: PolicyRule[] = [];
+                const pol = policy[index];
+
+                this.log.info("  Policy name: " + pol.name + " | Violated:" + pol.isViolated + " | Policy Description: " + pol.description);
+                rules = pol.rules;
+                rules.forEach((value) => {
+                    this.log.info("     Rule name: " + value.name + " | Violated: " + value.isViolated);
+                });
+            }
+            this.log.info("-----------------------------------------------------------");
+        }
+    }
+
+    private async addScaPolicyViolationsToScanResults(result: SCAResults) {
+        if (!this.config.scaEnablePolicyViolations) {
+            return;
+        }
+        this.log.debug(" Fetching SCA policy violation. ");
+        const reportID = await this.getReportId();
+        const policyEvaluation = await this.getProjectViolations(reportID);
+        this.log.debug(" Successfully fetched SCA policy violations. ");
+        result.scaPolicyViolation = policyEvaluation;
+    }
+
+    private async getProjectViolations(reportID: string): Promise<PolicyEvaluation[]> {
+        const path = `policy-management/policy-evaluation/?reportId=${reportID}`;
+        return this.httpClient.getRequest(path, { baseUrlOverride: this.config.apiUrl });
     }
 
     private async retrieveScanResults(): Promise<SCAResults> {
