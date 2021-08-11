@@ -48,8 +48,7 @@ export class HttpClient {
     private proxyResult = '';
     private proxyContent = '';
     private scaSettings: ScaLoginSettings | any;
-    isSsoLogin: boolean = false;
-    private loginType:string = '';
+    isSSOLogin: boolean = false;
 
     constructor(private readonly baseUrl: string, private readonly origin: string, private readonly originUrl : string, private readonly log: Logger, private proxyConfig?: ProxyConfig ) {
     }
@@ -182,15 +181,14 @@ export class HttpClient {
                    this.accessToken = response.body.access_token;
                    this.refreshToken = response.body.refresh_token;
                    this.tokenExpTime = this.getAccessTokenExpTimeinMS(response.body.expires_in);
-                   this.isSsoLogin = true;
-                   this.loginType = 'SSAMLSSO';
+                   this.isSSOLogin = true;
                 },
                 (err: any) => {
                     const status = err && err.response ? (err.response as request.Response).status : 'n/a';
                     const message = err && err.message ? err.message : 'n/a';
                     this.log.error(err);
                     this.log.error(`POST request failed to ${fullUrl}. HTTP status: ${status}, message: ${message}`);
-                    throw Error('Login failed. Error while getting access token from Authorization code.');
+                    throw Error('Login failed');
                 }
             );
            
@@ -246,14 +244,14 @@ export class HttpClient {
                     this.accessToken = response.body.access_token;
                     this.refreshToken = response.body.refresh_token;
                     this.tokenExpTime = this.getAccessTokenExpTimeinMS(response.body.expires_in);
-                    this.isSsoLogin = true;
+                    this.isSSOLogin = true;
                 },
                 (err: any) => {
                     const status = err && err.response ? (err.response as request.Response).status : 'n/a';
                     const message = err && err.message ? err.message : 'n/a';
                     this.log.error(err);
                     this.log.error(`POST request failed to ${fullUrl}. HTTP status: ${status}, message: ${message}`);
-                    throw Error('Login failed. Error while getting access token from refresh token.');
+                    throw Error('Login failed');
                 }
             );
            
@@ -289,8 +287,7 @@ export class HttpClient {
         this.log.info('Logging into the Checkmarx service.');
         this.username = username;
         this.password = password;
-        this.isSsoLogin = false;
-        this.loginType = 'UserCred';
+        this.isSSOLogin = false;
         return this.loginWithStoredCredentials();
     }
 
@@ -302,8 +299,7 @@ export class HttpClient {
         this.accessToken = '';
         this.refreshToken = '';
         this.tokenExpTime = 0;
-        this.loginType = '';
-        this.isSsoLogin = false;
+        this.isSSOLogin = false;
     }
 
     getRequest(relativePath: string, options?: RequestOptions): Promise<any> {
@@ -391,8 +387,10 @@ export class HttpClient {
                 await this.scaLogin(this.scaSettings);
             } else if (this.username && this.password) {
                 await this.loginWithStoredCredentials();
-            } else if (this.isSsoLogin && this.loginType === 'WindowsSSO' ) {
-                this.ssoLogin();
+            } else if (this.isSSOLogin) {
+                if(this.refreshToken != ''){
+                    await this.getAccessTokenFromRefreshRoken(this.authSSODetails);
+                }
             }
 
             const optionsClone = Object.assign({}, options);
@@ -450,7 +448,7 @@ export class HttpClient {
                 (response: request.Response) => {
                     this.accessToken = response.body.access_token;
                     this.tokenExpTime = this.getAccessTokenExpTimeinMS(response.body.expires_in);
-                    this.isSsoLogin = false;
+                    this.isSSOLogin = false;
                 },
                 (err: any) => {
                     const status = err && err.response ? (err.response as request.Response).status : 'n/a';
@@ -518,7 +516,6 @@ export class HttpClient {
                 this.cookies.set('cookie', line.split('cookie: ')[1]);
             }
         });
-        this.isSsoLogin = true;
-        this.loginType = 'WindowsSSO';
+        this.isSSOLogin = true;
     }
 }
