@@ -14,7 +14,7 @@ import pac = require('pac-resolver');
 
 
 interface InternalRequestOptions extends RequestOptions {
-    method: 'put' | 'post' | 'get';
+    method: 'put' | 'post' | 'get' | 'patch';
     singlePostData?: object;
     multipartPostData?: {
         fields: { [fieldName: string]: any },
@@ -310,7 +310,11 @@ export class HttpClient {
         const internalOptions: InternalRequestOptions = { retry: true, method: 'get' };
         return this.sendRequest(relativePath, Object.assign(internalOptions, options));
     }
-
+	
+	patchRequest(relativePath: string, data: object): Promise<any> {
+        return this.sendRequest(relativePath, { singlePostData: data, retry: true, method: 'patch' });
+    }
+	
     postRequest(relativePath: string, data: object): Promise<any> {
         return this.sendRequest(relativePath, { singlePostData: data, retry: true, method: 'post' });
     }
