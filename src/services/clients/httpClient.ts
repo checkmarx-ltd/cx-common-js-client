@@ -50,18 +50,34 @@ export class HttpClient {
     private scaSettings: ScaLoginSettings | any;
     isSsoLogin: boolean = false;
     private loginType:string = '';
+    private certificate : string | any;
 
-    constructor(private readonly baseUrl: string, private readonly origin: string, private readonly originUrl : string, private readonly log: Logger, private proxyConfig?: ProxyConfig ) {
+    constructor(private readonly baseUrl: string, private readonly origin: string, private readonly originUrl : string, private readonly log: Logger, private proxyConfig?: ProxyConfig, private certFilePath? : string ) {
+
+        if(this.certFilePath)
+        {
+            this.certificate = fs.readFileSync(this.certFilePath);
+        }
     }
     async getProxyContent() {
         try{ 
            require('superagent-proxy')(request);
            if (this.proxyConfig && this.proxyConfig.proxyUrl) {
-            await request.get(this.proxyConfig.proxyUrl)
-                .accept('json')
-                .then((res: { text: string; }) => {
-                    this.proxyContent = res.text;
-                });
+               if(this.certificate){
+                    await request.get(this.proxyConfig.proxyUrl)
+                        .accept('json')
+                        .ca(this.certificate)
+                        .then((res: { text: string; }) => {
+                        this.proxyContent = res.text;
+                    });
+                }else{
+                    await request.get(this.proxyConfig.proxyUrl)
+                        .accept('json')
+                        .then((res: { text: string; }) => {
+                        this.proxyContent = res.text;
+                    });
+
+                }
         }
         }catch(e){
             this.log.error(" Pac file is not found or empty.Hence ignoring the proxy");
@@ -170,7 +186,9 @@ export class HttpClient {
         if (proxyUrl) {
             newRequest.proxy(proxyUrl);
         }
-
+        if(this.certificate){
+            newRequest.ca(this.certificate);
+        }
        return newRequest.send({
             grant_type: APIConstants.AUTHORIZATION_CODE,
             client_id: authSSODetails.clientId,
@@ -235,7 +253,9 @@ export class HttpClient {
         if (proxyUrl) {
             newRequest.proxy(proxyUrl);
         }
-
+        if(this.certificate){
+            newRequest.ca(this.certificate);
+        }
        return newRequest.send({
             grant_type: APIConstants.REFRESH_TOKEN,
             client_id: authSSODetails.clientId,
@@ -361,6 +381,9 @@ export class HttpClient {
                 .set('cxOrigin', this.origin)
                 .set('cxOriginUrl',this.originUrl);
         }
+        if(this.certificate){
+            result.ca(this.certificate);
+        }
 
         if (this.accessToken) {
             result.auth(this.accessToken, { type: 'bearer' });
@@ -442,6 +465,9 @@ export class HttpClient {
         if (proxyUrl) {
             newRequest.proxy(proxyUrl);
         }
+        if(this.certificate){
+            newRequest.ca(this.certificate);
+        }
         return newRequest.send({
             userName: this.username,
             password: this.password,
@@ -479,6 +505,9 @@ export class HttpClient {
             .type('form');
         if (proxyUrl) {
             newRequest.proxy(proxyUrl)
+        }
+        if(this.certificate){
+            newRequest.ca(this.certificate);
         }
         // Pass tenant name in a custom header. This will allow to get token from on-premise access control server
         // and then use this token for SCA authentication in cloud.
