@@ -52,7 +52,8 @@
     "debug": "^4.3.2",
     "lodash": "^4.17.21",
     "glob-parent": "^5.1.2",
-    "y18n": "^4.0.1"
+    "y18n": "^4.0.1",
+    "snapdragon": "^0.12.1"
   },
   "devDependencies": {
     "@types/archiver": "^2.1.3",
