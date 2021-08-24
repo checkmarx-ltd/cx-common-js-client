@@ -56,7 +56,11 @@ export class HttpClient {
 
         if(this.certFilePath)
         {
-            this.certificate = fs.readFileSync(this.certFilePath);
+            try{
+                this.certificate = fs.readFileSync(this.certFilePath);
+            }catch(e){
+                this.log.error(`Error while reading certificate file. ${e}`);
+            }
         }
     }
     async getProxyContent() {
