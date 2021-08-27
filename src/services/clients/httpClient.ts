@@ -7,12 +7,14 @@ import { ScaClient } from './scaClient';
 import { ProxyConfig } from "../..";
 import { ProxyHelper } from "../proxyHelper";
 import { SuperAgentRequest } from "superagent";
+import { AuthSSODetails } from "../../dto/authSSODetails";
+import { APIConstants } from "../../dto/apiConstant";
 import fs = require('fs');
 import pac = require('pac-resolver');
 
 
 interface InternalRequestOptions extends RequestOptions {
-    method: 'put' | 'post' | 'get';
+    method: 'put' | 'post' | 'get' | 'patch';
     singlePostData?: object;
     multipartPostData?: {
         fields: { [fieldName: string]: any },
@@ -33,26 +35,53 @@ interface RequestOptions {
  * Implements low-level API request logic.
  */
 export class HttpClient {
-    accessToken: string = '';
+   
     cookies: Map<string, string> = new Map<string, string>();
-
     private username = '';
     private password = '';
+
+    authSSODetails: AuthSSODetails | any;
+    accessToken: string = '';
+    refreshToken: string = '';
+    tokenExpTime: number = 0;
+
     private proxyResult = '';
     private proxyContent = '';
     private scaSettings: ScaLoginSettings | any;
-    private isSsoLogin: boolean = false;
-    constructor(private readonly baseUrl: string, private readonly origin: string, private readonly originUrl : string, private readonly log: Logger, private proxyConfig?: ProxyConfig) {
+    isSsoLogin: boolean = false;
+    private loginType:string = '';
+    private certificate : string | any;
+
+    constructor(private readonly baseUrl: string, private readonly origin: string, private readonly originUrl : string, private readonly log: Logger, private proxyConfig?: ProxyConfig, private certFilePath? : string ) {
+
+        if(this.certFilePath)
+        {
+            try{
+                this.certificate = fs.readFileSync(this.certFilePath);
+            }catch(e){
+                this.log.error(`Error while reading certificate file. ${e}`);
+            }
+        }
     }
     async getProxyContent() {
         try{ 
            require('superagent-proxy')(request);
            if (this.proxyConfig && this.proxyConfig.proxyUrl) {
-            await request.get(this.proxyConfig.proxyUrl)
-                .accept('json')
-                .then((res: { text: string; }) => {
-                    this.proxyContent = res.text;
-                });
+               if(this.certificate){
+                    await request.get(this.proxyConfig.proxyUrl)
+                        .accept('json')
+                        .ca(this.certificate)
+                        .then((res: { text: string; }) => {
+                        this.proxyContent = res.text;
+                    });
+                }else{
+                    await request.get(this.proxyConfig.proxyUrl)
+                        .accept('json')
+                        .then((res: { text: string; }) => {
+                        this.proxyContent = res.text;
+                    });
+
+                }
         }
         }catch(e){
             this.log.error(" Pac file is not found or empty.Hence ignoring the proxy");
@@ -102,6 +131,158 @@ export class HttpClient {
        
     }
 
+    /**
+     * This method checks  if access token is expired or not.
+     * @returns 
+     */
+     isTokenExpired(): boolean {
+        let currentTime : number;
+        let dateTime = new Date();
+        currentTime =  dateTime.getTime();
+        if(currentTime > this.tokenExpTime)
+        {
+            return true;
+        }
+        else
+        {
+            return false;
+        }
+    }
+
+    /**
+     * This method forms URL to get authorization code
+     * @param authSSODetails AuthSSODetails object contains details about SSO login
+     * @returns 
+     */
+     
+    async getAuthorizationCodeURL(authSSODetails : AuthSSODetails) : Promise<string> {
+        
+        let authCodeURL : string = '';
+        authCodeURL += this.baseUrl + APIConstants.authorizationEP;
+        authCodeURL += "?"+APIConstants.CLIENT_ID+"=" + authSSODetails.clientId;
+        authCodeURL += "&"+APIConstants.SCOPE+"=" + authSSODetails.scope;
+        authCodeURL += "&"+APIConstants.RESPONSE_TYPE+"=" + APIConstants.responseType;
+        authCodeURL += "&"+APIConstants.REDIRECT_URI+"=" + authSSODetails.redirectURI;
+        return authCodeURL;
+    }
+
+    /**
+     * This methos executed single sign on using authorization code
+     * @param authSSODetails AuthSSODetails object contains details about SSO login
+     * and populates access token, refresh token and token expiration time
+     */
+     getAccessTokenFromAuthorizationCode(authSSODetails : AuthSSODetails){
+
+        this.authSSODetails = authSSODetails;
+
+        this.log.info('Logging into Checkmarx SAST service using Web SSO.');
+        require('superagent-proxy')(request);
+        const fullUrl = url.resolve(this.baseUrl, APIConstants.accessTokenEP);
+    
+        let proxyUrl;
+        if (this.proxyConfig) {
+            proxyUrl = ProxyHelper.getFormattedProxy(this.proxyConfig);
+            this.log.debug('Request is being routed via proxy ' + proxyUrl);
+        }
+        let newRequest = request.post(fullUrl)
+            .set('Content-Type','application/x-www-form-urlencoded');
+
+        if (proxyUrl) {
+            newRequest.proxy(proxyUrl);
+        }
+        if(this.certificate){
+            newRequest.ca(this.certificate);
+        }
+       return newRequest.send({
+            grant_type: APIConstants.AUTHORIZATION_CODE,
+            client_id: authSSODetails.clientId,
+            redirect_uri: authSSODetails.redirectURI,
+            code:authSSODetails.code
+        })
+            .then(
+                (response: request.Response) => {
+                   this.accessToken = response.body.access_token;
+                   this.refreshToken = response.body.refresh_token;
+                   this.tokenExpTime = this.getAccessTokenExpTimeinMS(response.body.expires_in);
+                   this.isSsoLogin = true;
+                   this.loginType = 'SSAMLSSO';
+                },
+                (err: any) => {
+                    const status = err && err.response ? (err.response as request.Response).status : 'n/a';
+                    const message = err && err.message ? err.message : 'n/a';
+                    this.log.error(err);
+                    this.log.error(`POST request failed to ${fullUrl}. HTTP status: ${status}, message: ${message}`);
+                    throw Error('Login failed. Error while getting access token from Authorization code.');
+                }
+            );
+           
+    }
+
+    /**
+     * This method accepts access token expire time in sec , converts that to ms and
+     * adds that to current time and gives final access token expire time.
+     * 
+     * @param accessTokenExpTimeinSec Access token expires time in seconds
+     * @returns 
+     */
+    getAccessTokenExpTimeinMS(accessTokenExpTimeinSec : number): number {
+        let accessTokenExpTimeinms : number;
+        let dateTime = new Date();
+        accessTokenExpTimeinms =  dateTime.getTime();
+        accessTokenExpTimeinms = accessTokenExpTimeinms + (accessTokenExpTimeinSec* 1000);
+        return accessTokenExpTimeinms;
+    }
+
+    
+
+    /**
+     * This method gets access token from refreshed token
+     * @param authSSODetails AuthSSODetails object contains details about client
+     * and populates access token, refresh token and token expiration time
+     */
+     getAccessTokenFromRefreshRoken(authSSODetails : AuthSSODetails){
+
+        this.log.info('Logging into Checkmarx SAST service using Web SSO.');
+        require('superagent-proxy')(request);
+        const fullUrl = url.resolve(this.baseUrl, APIConstants.accessTokenEP);
+        
+        let proxyUrl;
+        if (this.proxyConfig) {
+            proxyUrl = ProxyHelper.getFormattedProxy(this.proxyConfig);
+            this.log.debug('Request is being routed via proxy ' + proxyUrl);
+        }
+        let newRequest = request.post(fullUrl)
+            .set('Content-Type','application/x-www-form-urlencoded');
+
+        if (proxyUrl) {
+            newRequest.proxy(proxyUrl);
+        }
+        if(this.certificate){
+            newRequest.ca(this.certificate);
+        }
+       return newRequest.send({
+            grant_type: APIConstants.REFRESH_TOKEN,
+            client_id: authSSODetails.clientId,
+            refresh_token: this.refreshToken
+        })
+            .then(
+                (response: request.Response) => {
+                    this.accessToken = response.body.access_token;
+                    this.refreshToken = response.body.refresh_token;
+                    this.tokenExpTime = this.getAccessTokenExpTimeinMS(response.body.expires_in);
+                    this.isSsoLogin = true;
+                },
+                (err: any) => {
+                    const status = err && err.response ? (err.response as request.Response).status : 'n/a';
+                    const message = err && err.message ? err.message : 'n/a';
+                    this.log.error(err);
+                    this.log.error(`POST request failed to ${fullUrl}. HTTP status: ${status}, message: ${message}`);
+                    throw Error('Login failed. Error while getting access token from refresh token.');
+                }
+            );
+           
+    }
+
     //If the pac proxy returning diffrent type then checking and adding it to url and forming final url 
     getProxyType(splitted: string[]){
        if (this.proxyConfig && this.proxyConfig.proxyUrl){
@@ -128,21 +309,24 @@ export class HttpClient {
        }
     }
 
-
-
     login(username: string, password: string) {
         this.log.info('Logging into the Checkmarx service.');
         this.username = username;
         this.password = password;
+        this.isSsoLogin = false;
+        this.loginType = 'UserCred';
         return this.loginWithStoredCredentials();
     }
 
     logout() {
         this.log.info('Logging out from Checkmarx service.');
-        this.accessToken = '';
         this.username = '';
         this.password = '';
         this.cookies.clear();
+        this.accessToken = '';
+        this.refreshToken = '';
+        this.tokenExpTime = 0;
+        this.loginType = '';
         this.isSsoLogin = false;
     }
 
@@ -150,7 +334,11 @@ export class HttpClient {
         const internalOptions: InternalRequestOptions = { retry: true, method: 'get' };
         return this.sendRequest(relativePath, Object.assign(internalOptions, options));
     }
-
+	
+	patchRequest(relativePath: string, data: object): Promise<any> {
+        return this.sendRequest(relativePath, { singlePostData: data, retry: true, method: 'patch' });
+    }
+	
     postRequest(relativePath: string, data: object): Promise<any> {
         return this.sendRequest(relativePath, { singlePostData: data, retry: true, method: 'post' });
     }
@@ -197,6 +385,9 @@ export class HttpClient {
                 .set('cxOrigin', this.origin)
                 .set('cxOriginUrl',this.originUrl);
         }
+        if(this.certificate){
+            result.ca(this.certificate);
+        }
 
         if (this.accessToken) {
             result.auth(this.accessToken, { type: 'bearer' });
@@ -231,7 +422,7 @@ export class HttpClient {
                 await this.scaLogin(this.scaSettings);
             } else if (this.username && this.password) {
                 await this.loginWithStoredCredentials();
-            } else if (this.isSsoLogin) {
+            } else if (this.isSsoLogin && this.loginType === 'WindowsSSO' ) {
                 this.ssoLogin();
             }
 
@@ -266,7 +457,6 @@ export class HttpClient {
 
     private loginWithStoredCredentials() {
         require('superagent-proxy')(request);
-        
         const fullUrl = url.resolve(this.baseUrl, 'auth/identity/connect/token');
         let proxyUrl;
         if (this.proxyConfig) {
@@ -279,6 +469,9 @@ export class HttpClient {
         if (proxyUrl) {
             newRequest.proxy(proxyUrl);
         }
+        if(this.certificate){
+            newRequest.ca(this.certificate);
+        }
         return newRequest.send({
             userName: this.username,
             password: this.password,
@@ -290,6 +483,8 @@ export class HttpClient {
             .then(
                 (response: request.Response) => {
                     this.accessToken = response.body.access_token;
+                    this.tokenExpTime = this.getAccessTokenExpTimeinMS(response.body.expires_in);
+                    this.isSsoLogin = false;
                 },
                 (err: any) => {
                     const status = err && err.response ? (err.response as request.Response).status : 'n/a';
@@ -299,11 +494,10 @@ export class HttpClient {
                 }
             );
     }
-
+    
     async scaLogin(settings: ScaLoginSettings) {
         require('superagent-proxy')(request);
         this.scaSettings = settings;
-        
         const fullUrl = url.resolve(settings.accessControlBaseUrl, ScaClient.AUTHENTICATION);
         let proxyUrl;
         if (this.proxyConfig) {
@@ -315,6 +509,9 @@ export class HttpClient {
             .type('form');
         if (proxyUrl) {
             newRequest.proxy(proxyUrl)
+        }
+        if(this.certificate){
+            newRequest.ca(this.certificate);
         }
         // Pass tenant name in a custom header. This will allow to get token from on-premise access control server
         // and then use this token for SCA authentication in cloud.
@@ -359,5 +556,6 @@ export class HttpClient {
             }
         });
         this.isSsoLogin = true;
+        this.loginType = 'WindowsSSO';
     }
 }
