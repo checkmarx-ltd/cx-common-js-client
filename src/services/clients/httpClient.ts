@@ -175,7 +175,7 @@ export class HttpClient {
 
         this.authSSODetails = authSSODetails;
 
-        this.log.info('Logging SSO into the Checkmarx ccservice .');
+        this.log.info('Logging into Checkmarx SAST service using Web SSO.');
         require('superagent-proxy')(request);
         const fullUrl = url.resolve(this.baseUrl, APIConstants.accessTokenEP);
     
@@ -242,7 +242,7 @@ export class HttpClient {
      */
      getAccessTokenFromRefreshRoken(authSSODetails : AuthSSODetails){
 
-        this.log.info('Logging SSO into the Checkmarx ccservice .');
+        this.log.info('Logging into Checkmarx SAST service using Web SSO.');
         require('superagent-proxy')(request);
         const fullUrl = url.resolve(this.baseUrl, APIConstants.accessTokenEP);
         
