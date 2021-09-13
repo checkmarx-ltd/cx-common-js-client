@@ -28,5 +28,5 @@ export interface ScaConfig {
     envVariables:Map<string, string>;
     scaSastTeam:string;
     isExploitable:boolean;
-
+    cacert_chainFilePath: string;
 }

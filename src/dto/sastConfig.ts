@@ -19,4 +19,5 @@ export interface SastConfig {
     highThreshold?: number;
     mediumThreshold?: number;
     lowThreshold?: number;
+    cacert_chainFilePath: string;
 }

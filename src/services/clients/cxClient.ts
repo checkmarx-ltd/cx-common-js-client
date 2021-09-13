@@ -92,9 +92,9 @@ export class CxClient {
 
         if (!httpClient) {
             if (this.config.enableProxy && this.config.proxyConfig && (this.proxyConfig.proxyHost != '' || this.proxyConfig.proxyUrl != '')) {
-                this.httpClient = new HttpClient(baseUrl, this.config.cxOrigin, this.config.cxOriginUrl,this.log, this.proxyConfig);
+                this.httpClient = new HttpClient(baseUrl, this.config.cxOrigin, this.config.cxOriginUrl,this.log, this.proxyConfig, this.sastConfig.cacert_chainFilePath);
             } else {
-                this.httpClient = new HttpClient(baseUrl, this.config.cxOrigin, this.config.cxOriginUrl,this.log);
+                this.httpClient = new HttpClient(baseUrl, this.config.cxOrigin, this.config.cxOriginUrl,this.log, this.sastConfig.cacert_chainFilePath);
             }
             await this.httpClient.getPacProxyResolve();
             await this.httpClient.login(this.sastConfig.username, this.sastConfig.password);
@@ -114,9 +114,9 @@ export class CxClient {
     private async initScaClient() {
         let scaHttpClient: HttpClient;
         if (this.config.enableProxy && this.config.proxyConfig && (this.proxyConfig.proxyHost != '' || this.proxyConfig.proxyUrl != '')) {
-            scaHttpClient = new HttpClient(this.scaConfig.apiUrl, this.config.cxOrigin, this.config.cxOriginUrl,this.log, this.proxyConfig);
+            scaHttpClient = new HttpClient(this.scaConfig.apiUrl, this.config.cxOrigin, this.config.cxOriginUrl,this.log, this.proxyConfig, this.scaConfig.cacert_chainFilePath);
         } else {
-            scaHttpClient = new HttpClient(this.scaConfig.apiUrl, this.config.cxOrigin, this.config.cxOriginUrl,this.log);
+            scaHttpClient = new HttpClient(this.scaConfig.apiUrl, this.config.cxOrigin, this.config.cxOriginUrl,this.log, undefined, this.scaConfig.cacert_chainFilePath);
         }
 
         this.scaClient = new ScaClient(this.scaConfig, this.config.sourceLocation, scaHttpClient, this.log, this.config);
