@@ -34,7 +34,6 @@ export class CxClient {
     private projectId = 0;
     private presetId = 0;
     private isPolicyEnforcementSupported = false;
-
     private config: ScanConfig | any;
     private sastConfig: SastConfig | any;
     private scaConfig: ScaConfig | any;
@@ -213,7 +212,8 @@ export class CxClient {
                 isPublic: this.sastConfig.isPublic,
                 forceScan: this.sastConfig.forceScan,
                 presetId: this.presetId,
-                comment: this.sastConfig.comment
+                comment: this.sastConfig.comment,
+                engineConfigurationId:this.sastConfig.engineConfigurationId
             },
             { zippedSource: tempFilename });
             await this.deleteZip(tempFilename);
