@@ -33,6 +33,7 @@ export class CxClient {
     private teamId = 0;
     private projectId = 0;
     private presetId = 0;
+    private postScanActionId = 0;
     private isPolicyEnforcementSupported = false;
     private config: ScanConfig | any;
     private sastConfig: SastConfig | any;
@@ -213,7 +214,8 @@ export class CxClient {
                 forceScan: this.sastConfig.forceScan,
                 presetId: this.presetId,
                 comment: this.sastConfig.comment,
-                engineConfigurationId:this.sastConfig.engineConfigurationId
+                engineConfigurationId:this.sastConfig.engineConfigurationId,
+                postScanActionId:this.postScanActionId
             },
             { zippedSource: tempFilename });
             await this.deleteZip(tempFilename);
@@ -428,11 +430,37 @@ Scan results location:  ${result.sastScanResultsLink}
             this.teamId = await teamApiClient.getTeamIdByName(this.sastConfig.teamName);
         }
 
+        if (this.sastConfig.postScanActionId) {
+            this.postScanActionId = this.sastConfig.postScanActionId;
+        }
+        else {
+            this.postScanActionId = await this.getScanPostActionIdfromName(this.sastConfig.postScanActionName);
+        }
+
         if (this.config.projectId) {
             this.projectId = this.config.projectId;
         }
         else {
             this.projectId = await this.getOrCreateProject();
+        }
+    }
+
+    /**
+     * This method retrieves post scan action Id from name and returns ID
+     * @param postScanActionName - Post scan action Name
+     * @returns  - Post scan action ID
+     */
+    private async getScanPostActionIdfromName(postScanActionName: string)
+    {
+        const customTasks =  await this.httpClient.getRequest('customTasks/name/' + this.sastConfig.postScanActionName) as any[];
+        if(customTasks){
+            const foundCustomTask = customTasks.find(customTask => customTask.name === postScanActionName );
+            if(foundCustomTask){
+                this.log.debug(`Resolved post scan action ID: ${foundCustomTask.id}`);
+                return foundCustomTask.id;
+            } else {
+                throw Error(`Could not resolve post scan action ID from name: ${postScanActionName}`);
+            }
         }
     }
 

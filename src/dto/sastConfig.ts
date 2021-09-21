@@ -21,4 +21,6 @@ export interface SastConfig {
     lowThreshold?: number;
     cacert_chainFilePath: string;
     engineConfigurationId?: number;
+    postScanActionName: string;
+    postScanActionId?: number;
 }
