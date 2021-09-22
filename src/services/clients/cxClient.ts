@@ -34,6 +34,7 @@ export class CxClient {
     private projectId = 0;
     private presetId = 0;
     private isPolicyEnforcementSupported = false;
+
     private config: ScanConfig | any;
     private sastConfig: SastConfig | any;
     private scaConfig: ScaConfig | any;
@@ -91,9 +92,9 @@ export class CxClient {
 
         if (!httpClient) {
             if (this.config.enableProxy && this.config.proxyConfig && (this.proxyConfig.proxyHost != '' || this.proxyConfig.proxyUrl != '')) {
-                this.httpClient = new HttpClient(baseUrl, this.config.cxOrigin, this.config.cxOriginUrl,this.log, this.proxyConfig, this.sastConfig.cacert_chainFilePath);
+                this.httpClient = new HttpClient(baseUrl, this.config.cxOrigin, this.config.cxOriginUrl,this.log, this.proxyConfig);
             } else {
-                this.httpClient = new HttpClient(baseUrl, this.config.cxOrigin, this.config.cxOriginUrl,this.log, this.sastConfig.cacert_chainFilePath);
+                this.httpClient = new HttpClient(baseUrl, this.config.cxOrigin, this.config.cxOriginUrl,this.log);
             }
             await this.httpClient.getPacProxyResolve();
             await this.httpClient.login(this.sastConfig.username, this.sastConfig.password);
@@ -113,9 +114,9 @@ export class CxClient {
     private async initScaClient() {
         let scaHttpClient: HttpClient;
         if (this.config.enableProxy && this.config.proxyConfig && (this.proxyConfig.proxyHost != '' || this.proxyConfig.proxyUrl != '')) {
-            scaHttpClient = new HttpClient(this.scaConfig.apiUrl, this.config.cxOrigin, this.config.cxOriginUrl,this.log, this.proxyConfig, this.scaConfig.cacert_chainFilePath);
+            scaHttpClient = new HttpClient(this.scaConfig.apiUrl, this.config.cxOrigin, this.config.cxOriginUrl,this.log, this.proxyConfig);
         } else {
-            scaHttpClient = new HttpClient(this.scaConfig.apiUrl, this.config.cxOrigin, this.config.cxOriginUrl,this.log, undefined, this.scaConfig.cacert_chainFilePath);
+            scaHttpClient = new HttpClient(this.scaConfig.apiUrl, this.config.cxOrigin, this.config.cxOriginUrl,this.log);
         }
 
         this.scaClient = new ScaClient(this.scaConfig, this.config.sourceLocation, scaHttpClient, this.log, this.config);
@@ -197,27 +198,36 @@ export class CxClient {
             projectId = await this.createNewProject();
             this.log.debug(`Project created. ID: ${projectId}`);
         }
-
+``
         return projectId;
     }
 
     private async scanWithSetting(): Promise<ScanWithSettingsResponse> {
         const tempFilename = await this.zipContent();
         this.log.info(`Uploading the zipped source code.`);
-            const scanResponse: ScanWithSettingsResponse = await this.httpClient.postMultipartRequest('sast/scanWithSettings',
-            {
-                projectId: this.projectId,
-                overrideProjectSetting: this.isNewProject,
-                isIncremental: this.sastConfig.isIncremental,
-                isPublic: this.sastConfig.isPublic,
-                forceScan: this.sastConfig.forceScan,
-                presetId: this.presetId,
-                comment: this.sastConfig.comment,
-                engineConfigurationId:this.sastConfig.engineConfigurationId
-            },
-            { zippedSource: tempFilename });
-            await this.deleteZip(tempFilename);
-            return scanResponse;
+        var apiVersionHeader = {};
+        let versionInfo = await this.getVersionInfo();
+        let version = versionInfo.version;
+        if(version.includes('9.4')){
+            apiVersionHeader = {'Content-type' : 'application/json;v=1.2'};
+        }
+        
+        const scanResponse: ScanWithSettingsResponse = await this.httpClient.postMultipartRequest('sast/scanWithSettings',
+        {
+            projectId: this.projectId,
+            overrideProjectSetting: this.isNewProject,
+            isIncremental: this.sastConfig.isIncremental,
+            isPublic: this.sastConfig.isPublic,
+            forceScan: this.sastConfig.forceScan,
+            presetId: this.presetId,
+            comment: this.sastConfig.comment,
+            customFields: this.sastConfig.customFields
+        },
+        { zippedSource: tempFilename },
+        apiVersionHeader);
+        
+        await this.deleteZip(tempFilename);
+        return scanResponse;
     }
 
     private async uploadSourceCode(): Promise<void> {

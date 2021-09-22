@@ -11,6 +11,7 @@ import { AuthSSODetails } from "../../dto/authSSODetails";
 import { APIConstants } from "../../dto/apiConstant";
 import fs = require('fs');
 import pac = require('pac-resolver');
+import { isObject } from 'util';
 
 
 interface InternalRequestOptions extends RequestOptions {
@@ -24,6 +25,7 @@ interface InternalRequestOptions extends RequestOptions {
         attachments: { [fieldName: string]: string }
     };
     retry: boolean;
+    customHeaders: any
 }
 
 interface RequestOptions {
@@ -175,7 +177,7 @@ export class HttpClient {
 
         this.authSSODetails = authSSODetails;
 
-        this.log.info('Logging into Checkmarx SAST service using Web SSO.');
+        this.log.info('Logging SSO into the Checkmarx ccservice .');
         require('superagent-proxy')(request);
         const fullUrl = url.resolve(this.baseUrl, APIConstants.accessTokenEP);
     
@@ -242,7 +244,7 @@ export class HttpClient {
      */
      getAccessTokenFromRefreshRoken(authSSODetails : AuthSSODetails){
 
-        this.log.info('Logging into Checkmarx SAST service using Web SSO.');
+        this.log.info('Logging SSO into the Checkmarx ccservice .');
         require('superagent-proxy')(request);
         const fullUrl = url.resolve(this.baseUrl, APIConstants.accessTokenEP);
         
@@ -331,34 +333,38 @@ export class HttpClient {
     }
 
     getRequest(relativePath: string, options?: RequestOptions): Promise<any> {
-        const internalOptions: InternalRequestOptions = { retry: true, method: 'get' };
+        const internalOptions: InternalRequestOptions = { retry: true, method: 'get', customHeaders:{} };
         return this.sendRequest(relativePath, Object.assign(internalOptions, options));
     }
 	
 	patchRequest(relativePath: string, data: object): Promise<any> {
-        return this.sendRequest(relativePath, { singlePostData: data, retry: true, method: 'patch' });
+        return this.sendRequest(relativePath, { singlePostData: data, retry: true, method: 'patch', customHeaders:{} } );
     }
 	
     postRequest(relativePath: string, data: object): Promise<any> {
-        return this.sendRequest(relativePath, { singlePostData: data, retry: true, method: 'post' });
+        return this.sendRequest(relativePath, { singlePostData: data, retry: true, method: 'post', customHeaders:{} });
     }
 
     putRequest(relativePath: string, data: object): Promise<any> {
-        return this.sendRequest(relativePath, { singlePostData: data, retry: true, method: 'put' });
+        return this.sendRequest(relativePath, { singlePostData: data, retry: true, method: 'put', customHeaders:{} });
     }
 
     postMultipartRequest(relativePath: string,
         fields: { [fieldName: string]: any },
-        attachments: { [fieldName: string]: string }) {
+        attachments: { [fieldName: string]: string },
+        additionalHeaders: {}) {
         return this.sendRequest(relativePath, {
             method: 'post',
             multipartPostData: {
                 fields,
                 attachments
             },
-            retry: true
+            retry: true,
+            customHeaders: additionalHeaders
         });
     }
+
+    private isObject(obj:object) { return Object(obj) === obj; };
 
     private sendRequest(relativePath: string, options: InternalRequestOptions): Promise<any> {
         require('superagent-proxy')(request);
@@ -385,6 +391,19 @@ export class HttpClient {
                 .set('cxOrigin', this.origin)
                 .set('cxOriginUrl',this.originUrl);
         }
+
+        if(options.customHeaders)
+        {
+            if (this.isObject(options.customHeaders)) 
+            {
+                for(var key in options.customHeaders) 
+                {
+                    result.set(key, options.customHeaders[key]);  
+                    //this.log.info(`Custom header is fetched [${key}] - [${options.customHeaders[key]}]`);    
+                }        
+             }  
+        }
+
         if(this.certificate){
             result.ca(this.certificate);
         }
