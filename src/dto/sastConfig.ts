@@ -20,7 +20,9 @@ export interface SastConfig {
     mediumThreshold?: number;
     lowThreshold?: number;
     cacert_chainFilePath: string;
+    customFields: string;
     engineConfigurationId?: number;
     postScanActionName: string;
     postScanActionId?: number;
+    avoidDuplicateProjectScans:boolean;
 }

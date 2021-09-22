@@ -58,6 +58,14 @@ export class CxClient {
             this.log.info('Initializing Cx client');
             await this.initClients(httpClient);
             await this.initDynamicFields();
+
+            if(this.sastConfig.avoidDuplicateProjectScans)
+            {
+              const scanInProgress = await this.sastClient.checkQueueScansInProgress(this.projectId);
+              if(scanInProgress){
+                throw Error("Project scan is already in progress.");
+              }
+            }   
             result = await this.createSASTScan(result);
 
             if (this.config.isSyncMode) {
@@ -205,6 +213,12 @@ export class CxClient {
     private async scanWithSetting(): Promise<ScanWithSettingsResponse> {
         const tempFilename = await this.zipContent();
         this.log.info(`Uploading the zipped source code.`);
+        var apiVersionHeader = {};
+        let versionInfo = await this.getVersionInfo();
+        let version = versionInfo.version;
+        if(version.includes('9.4')){
+            apiVersionHeader = {'Content-type' : 'application/json;v=1.2'};
+        }
             const scanResponse: ScanWithSettingsResponse = await this.httpClient.postMultipartRequest('sast/scanWithSettings',
             {
                 projectId: this.projectId,
@@ -214,10 +228,11 @@ export class CxClient {
                 forceScan: this.sastConfig.forceScan,
                 presetId: this.presetId,
                 comment: this.sastConfig.comment,
+                customFields: this.sastConfig.customFields,
                 engineConfigurationId:this.sastConfig.engineConfigurationId,
                 postScanActionId:this.postScanActionId
             },
-            { zippedSource: tempFilename });
+            { zippedSource: tempFilename },apiVersionHeader);
             await this.deleteZip(tempFilename);
             return scanResponse;
     }
@@ -434,7 +449,7 @@ Scan results location:  ${result.sastScanResultsLink}
             this.postScanActionId = this.sastConfig.postScanActionId;
         }
         else {
-            this.postScanActionId = await this.getScanPostActionIdfromName(this.sastConfig.postScanActionName);
+            this.postScanActionId = await this.sastClient.getScanPostActionIdfromName(this.sastConfig.postScanActionName);
         }
 
         if (this.config.projectId) {
@@ -445,25 +460,7 @@ Scan results location:  ${result.sastScanResultsLink}
         }
     }
 
-    /**
-     * This method retrieves post scan action Id from name and returns ID
-     * @param postScanActionName - Post scan action Name
-     * @returns  - Post scan action ID
-     */
-    private async getScanPostActionIdfromName(postScanActionName: string)
-    {
-        const customTasks =  await this.httpClient.getRequest('customTasks/name/' + this.sastConfig.postScanActionName) as any[];
-        if(customTasks){
-            const foundCustomTask = customTasks.find(customTask => customTask.name === postScanActionName );
-            if(foundCustomTask){
-                this.log.debug(`Resolved post scan action ID: ${foundCustomTask.id}`);
-                return foundCustomTask.id;
-            } else {
-                throw Error(`Could not resolve post scan action ID from name: ${postScanActionName}`);
-            }
-        }
-    }
-
+    
     private logBuildFailure(failure: ScanSummary) {
         this.log.error(
             `********************************************

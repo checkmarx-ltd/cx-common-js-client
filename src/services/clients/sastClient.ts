@@ -104,6 +104,51 @@ export class SastClient {
         }
     }
 
+    /**
+     * This method retrieves post scan action Id from name and returns ID
+     * @param postScanActionName - Post scan action Name
+     * @returns  - Post scan action ID
+     */
+     async getScanPostActionIdfromName(postScanActionName: string)
+     {
+        this.log.info('Getting post action scan Id for post scan action : ' + postScanActionName);
+
+        const customTasks =  await this.httpClient.getRequest('customTasks/name/' + postScanActionName) as any[];
+         if(customTasks){
+             const foundCustomTask = customTasks.find(customTask => customTask.name === postScanActionName );
+             if(foundCustomTask){
+                 this.log.debug(`Resolved post scan action ID: ${foundCustomTask.id}`);
+                 return foundCustomTask.id;
+             } else {
+                 throw Error(`Could not resolve post scan action ID from name: ${postScanActionName}`);
+             }
+         }
+     }
+
+     /**
+      * This method checks if any scan is in progress for a project
+      * @param projectId  - Project ID for which scans are retrieved
+      * @returns 
+      */
+     async checkQueueScansInProgress(projectId : number)
+     {
+        this.log.info('Checking if any in progress project scan in queue.');
+        const settingsResponse = await this.httpClient.getRequest('sast/scansQueue?projectId=' + projectId);
+        if(settingsResponse)
+        {
+            for (const scanStatus of settingsResponse) 
+           {
+                if (SastClient.isInProgress(scanStatus)) {
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+        }else{
+            return false;
+        }
+     }
+ 
     private static throwScanError(status: ScanStatus) {
         let details = '';
         if (status) {
