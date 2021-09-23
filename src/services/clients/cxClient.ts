@@ -33,7 +33,8 @@ export class CxClient {
     private teamId = 0;
     private projectId = 0;
     private presetId = 0;
-    private postScanActionId = 0;
+    private postScanActionId : string = "";
+    private engineConfigurationId = 1;
     private isPolicyEnforcementSupported = false;
     private config: ScanConfig | any;
     private sastConfig: SastConfig | any;
@@ -229,7 +230,7 @@ export class CxClient {
                 presetId: this.presetId,
                 comment: this.sastConfig.comment,
                 customFields: this.sastConfig.customFields,
-                engineConfigurationId:this.sastConfig.engineConfigurationId,
+                engineConfigurationId:this.engineConfigurationId,
                 postScanActionId:this.postScanActionId
             },
             { zippedSource: tempFilename },apiVersionHeader);
@@ -445,11 +446,18 @@ Scan results location:  ${result.sastScanResultsLink}
             this.teamId = await teamApiClient.getTeamIdByName(this.sastConfig.teamName);
         }
 
-        if (this.sastConfig.postScanActionId) {
-            this.postScanActionId = this.sastConfig.postScanActionId;
+        
+        let postScanActionName = this.sastConfig.postScanActionName;
+        if(postScanActionName && postScanActionName.length > 0){
+            this.postScanActionId = await this.sastClient.getScanPostActionIdfromName(postScanActionName);
+            this.log.info("Post Scan Action ID : "+this.postScanActionId );
         }
-        else {
-            this.postScanActionId = await this.sastClient.getScanPostActionIdfromName(this.sastConfig.postScanActionName);
+            
+        if(this.sastConfig.engineConfigurationId)
+        {
+            this.engineConfigurationId = this.sastConfig.engineConfigurationId;
+        }else{
+            this.log.info("Engine Configuration ID is not configured, Using default.");
         }
 
         if (this.config.projectId) {
