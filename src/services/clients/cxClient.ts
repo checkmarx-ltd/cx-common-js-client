@@ -94,7 +94,7 @@ export class CxClient {
             if (this.config.enableProxy && this.config.proxyConfig && (this.proxyConfig.proxyHost != '' || this.proxyConfig.proxyUrl != '')) {
                 this.httpClient = new HttpClient(baseUrl, this.config.cxOrigin, this.config.cxOriginUrl,this.log, this.proxyConfig, this.sastConfig.cacert_chainFilePath);
             } else {
-                this.httpClient = new HttpClient(baseUrl, this.config.cxOrigin, this.config.cxOriginUrl,this.log, this.sastConfig.cacert_chainFilePath);
+                this.httpClient = new HttpClient(baseUrl, this.config.cxOrigin, this.config.cxOriginUrl,this.log, undefined, this.sastConfig.cacert_chainFilePath);
             }
             await this.httpClient.getPacProxyResolve();
             await this.httpClient.login(this.sastConfig.username, this.sastConfig.password);
