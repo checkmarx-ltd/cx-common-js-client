@@ -33,6 +33,8 @@ export class CxClient {
     private teamId = 0;
     private projectId = 0;
     private presetId = 0;
+    private postScanActionId : string = "";
+    private engineConfigurationId = 1;
     private isPolicyEnforcementSupported = false;
     private config: ScanConfig | any;
     private sastConfig: SastConfig | any;
@@ -57,6 +59,14 @@ export class CxClient {
             this.log.info('Initializing Cx client');
             await this.initClients(httpClient);
             await this.initDynamicFields();
+
+            if(this.sastConfig.avoidDuplicateProjectScans)
+            {
+              const scanInProgress = await this.sastClient.checkQueueScansInProgress(this.projectId);
+              if(scanInProgress){
+                throw Error("Project scan is already in progress.");
+              }
+            }   
             result = await this.createSASTScan(result);
 
             if (this.config.isSyncMode) {
@@ -204,6 +214,12 @@ export class CxClient {
     private async scanWithSetting(): Promise<ScanWithSettingsResponse> {
         const tempFilename = await this.zipContent();
         this.log.info(`Uploading the zipped source code.`);
+        var apiVersionHeader = {};
+        let versionInfo = await this.getVersionInfo();
+        let version = versionInfo.version;
+        if(version.includes('9.4')){
+            apiVersionHeader = {'Content-type' : 'application/json;v=1.2'};
+        }
             const scanResponse: ScanWithSettingsResponse = await this.httpClient.postMultipartRequest('sast/scanWithSettings',
             {
                 projectId: this.projectId,
@@ -213,9 +229,11 @@ export class CxClient {
                 forceScan: this.sastConfig.forceScan,
                 presetId: this.presetId,
                 comment: this.sastConfig.comment,
-                engineConfigurationId:this.sastConfig.engineConfigurationId
+                customFields: this.sastConfig.customFields,
+                engineConfigurationId:this.engineConfigurationId,
+                postScanActionId:this.postScanActionId
             },
-            { zippedSource: tempFilename });
+            { zippedSource: tempFilename },apiVersionHeader);
             await this.deleteZip(tempFilename);
             return scanResponse;
     }
@@ -428,6 +446,20 @@ Scan results location:  ${result.sastScanResultsLink}
             this.teamId = await teamApiClient.getTeamIdByName(this.sastConfig.teamName);
         }
 
+        
+        let postScanActionName = this.sastConfig.postScanActionName;
+        if(postScanActionName && postScanActionName.length > 0){
+            this.postScanActionId = await this.sastClient.getScanPostActionIdfromName(postScanActionName);
+            this.log.info("Post Scan Action ID : "+this.postScanActionId );
+        }
+            
+        if(this.sastConfig.engineConfigurationId)
+        {
+            this.engineConfigurationId = this.sastConfig.engineConfigurationId;
+        }else{
+            this.log.info("Engine Configuration ID is not configured, Using default.");
+        }
+
         if (this.config.projectId) {
             this.projectId = this.config.projectId;
         }
@@ -436,6 +468,7 @@ Scan results location:  ${result.sastScanResultsLink}
         }
     }
 
+    
     private logBuildFailure(failure: ScanSummary) {
         this.log.error(
             `********************************************
