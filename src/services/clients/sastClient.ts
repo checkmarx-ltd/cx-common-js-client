@@ -114,14 +114,20 @@ export class SastClient {
          
         this.log.info('Getting post action scan Id for post scan action : ' + postScanActionName);
 
-        const customTasks =  await this.httpClient.getRequest('customTasks/name/' + postScanActionName) as any[];
-        if(customTasks){
-            const foundCustomTask = customTasks.find(customTask => customTask.name === postScanActionName );
-            if(foundCustomTask){
-                this.log.debug(`Resolved post scan action ID: ${foundCustomTask.id}`);
-                return foundCustomTask.id;
-            } else {
-                throw Error(`Could not resolve post scan action ID from name: ${postScanActionName}`);
+        try{
+            const customTasks =  await this.httpClient.getRequest('customTasks/name/' + postScanActionName) as any[];
+            if(customTasks){
+                const foundCustomTask = customTasks.find(customTask => customTask.name === postScanActionName );
+                if(foundCustomTask){
+                    this.log.debug(`Resolved post scan action ID: ${foundCustomTask.id}`);
+                    return foundCustomTask.id;
+                } else {
+                    throw Error(`Could not resolve post scan action ID from name: ${postScanActionName}`);
+                }
+            }
+        } catch (e) {
+            if (e.status == 404) {
+                this.log.error('Post Scan Action name API is not supported.');
             }
         }
         
