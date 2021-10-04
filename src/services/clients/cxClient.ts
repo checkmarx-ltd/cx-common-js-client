@@ -451,6 +451,8 @@ Scan results location:  ${result.sastScanResultsLink}
         if(postScanActionName && postScanActionName.length > 0){
             this.postScanActionId = await this.sastClient.getScanPostActionIdfromName(postScanActionName);
             this.log.info("Post Scan Action ID : "+this.postScanActionId );
+            if(!this.postScanActionId)
+            this.postScanActionId  = "";
         }
             
         if(this.sastConfig.engineConfigurationId)
