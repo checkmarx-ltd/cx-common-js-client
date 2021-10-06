@@ -11,7 +11,6 @@ import { AuthSSODetails } from "../../dto/authSSODetails";
 import { APIConstants } from "../../dto/apiConstant";
 import fs = require('fs');
 import pac = require('pac-resolver');
-import { isObject } from 'util';
 
 
 interface InternalRequestOptions extends RequestOptions {
@@ -364,7 +363,7 @@ export class HttpClient {
         });
     }
 
-    private isObject(obj:object) { return Object(obj) === obj; };
+    private isObject(obj:object) { return Object(obj) === obj; }
 
     private sendRequest(relativePath: string, options: InternalRequestOptions): Promise<any> {
         require('superagent-proxy')(request);
