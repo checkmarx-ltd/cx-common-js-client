@@ -36,6 +36,7 @@ import { PolicyRule } from "../../dto/api/PolicyRule";
 
 import { config } from "process";
 import { SastClient } from "./sastClient";
+import {exists} from "fs";
 const fs = require('fs');
 ;/**
  * SCA - Software Composition Analysis - is the successor of OSA.
@@ -311,6 +312,7 @@ export class ScaClient {
         if (fingerprintsCollection.fingerprints && fingerprintsCollection.fingerprints.length) {
             const fingerprintsFilePath = `${os.tmpdir()}${path.sep}${ScaClient.FINGERPRINT_FILE_NAME}`;
 
+            await this.checkIfCanWriteToTheFile();
             FileIO.writeToFile(fingerprintsFilePath, fingerprintsCollection);
 
             return fingerprintsFilePath;
@@ -319,7 +321,36 @@ export class ScaClient {
         return '';
     }
 
-    private async fetchProjectResolvingConfiguration(): Promise<ScaResolvingConfiguration> {
+    /**
+     * Add a method that check if 'cxsca.sig' file exist and if it locked. If it locked we will unlock the file
+     * @private
+     */
+    private async checkIfCanWriteToTheFile(){
+        const tempFingerprintsFilePath = `${os.tmpdir()}${path.sep}${ScaClient.FINGERPRINT_FILE_NAME}`;
+        const fs = require("fs"); // Or `import fs from "fs";` with ESM
+        if (fs.existsSync(tempFingerprintsFilePath)) {
+            try {
+                const fileHandle = await fs.promises.open(tempFingerprintsFilePath, fs.constants.O_RDONLY | 0x10000000);
+                fileHandle.close();
+            } catch (error) {
+                if (error.code === 'EBUSY'){
+                    console.debug('file is busy');
+                    console.debug('unlock the file');
+                    fs.unlinkSync(tempFingerprintsFilePath);
+                    console.debug('Unclocked the file' + tempFingerprintsFilePath );
+                } else {
+                    console.debug('Failed to unlocked ' + tempFingerprintsFilePath+ ' file');
+                    throw error;
+                }
+            }
+        }else{
+            console.log('File ' + tempFingerprintsFilePath + 'does not exist');
+        }
+    }
+
+
+
+        private async fetchProjectResolvingConfiguration(): Promise<ScaResolvingConfiguration> {
         const guid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c: string) => {
             const r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
             return v.toString(16);
