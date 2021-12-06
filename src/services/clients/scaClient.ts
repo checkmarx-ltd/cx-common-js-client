@@ -296,6 +296,17 @@ export class ScaClient {
         }
     }
 
+    private async deleteCxScaSigFile(fileToDelete: string) {
+        if (fs.existsSync(fileToDelete)) {
+            this.log.debug(".cxsca.sig exists");
+            fs.unlinkSync(fileToDelete);
+            this.log.debug("Delete .cxsca.sig file");
+        } else {
+            this.log.error("File from ${fileToDelete} can not deleted. ");
+        }
+
+    }
+
     private async deleteZip(fileToDelete: string) {
         if (fs.existsSync(fileToDelete)) {
             fs.unlinkSync(fileToDelete);
@@ -308,47 +319,16 @@ export class ScaClient {
     private async createScanFingerprintsFile(fingerprintsFileFilter: FilePathFilter[]): Promise<string> {
         const fingerprintsCollector = new ScaFingerprintCollector(this.log, fingerprintsFileFilter);
         const fingerprintsCollection = await fingerprintsCollector.collectFingerprints(this.sourceLocation);
-
+        const fingerprintsFilePath = `${os.tmpdir()}${path.sep}${ScaClient.FINGERPRINT_FILE_NAME}`;
+        await this.deleteCxScaSigFile(fingerprintsFilePath);
         if (fingerprintsCollection.fingerprints && fingerprintsCollection.fingerprints.length) {
             const fingerprintsFilePath = `${os.tmpdir()}${path.sep}${ScaClient.FINGERPRINT_FILE_NAME}`;
-
-            await this.checkIfCanWriteToTheFile();
             FileIO.writeToFile(fingerprintsFilePath, fingerprintsCollection);
-
             return fingerprintsFilePath;
         }
 
         return '';
     }
-
-    /**
-     * Add a method that check if 'cxsca.sig' file exist and if it locked. If it locked we will unlock the file
-     * @private
-     */
-    private async checkIfCanWriteToTheFile(){
-        const tempFingerprintsFilePath = `${os.tmpdir()}${path.sep}${ScaClient.FINGERPRINT_FILE_NAME}`;
-        const fs = require("fs"); // Or `import fs from "fs";` with ESM
-        if (fs.existsSync(tempFingerprintsFilePath)) {
-            try {
-                const fileHandle = await fs.promises.open(tempFingerprintsFilePath, fs.constants.O_RDONLY | 0x10000000);
-                fileHandle.close();
-            } catch (error) {
-                if (error.code === 'EBUSY'){
-                    console.debug('file is busy');
-                    console.debug('unlock the file');
-                    fs.unlinkSync(tempFingerprintsFilePath);
-                    console.debug('Unclocked the file' + tempFingerprintsFilePath );
-                } else {
-                    console.debug('Failed to unlocked ' + tempFingerprintsFilePath+ ' file');
-                    throw error;
-                }
-            }
-        }else{
-            console.log('File ' + tempFingerprintsFilePath + 'does not exist');
-        }
-    }
-
-
 
         private async fetchProjectResolvingConfiguration(): Promise<ScaResolvingConfiguration> {
         const guid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c: string) => {
