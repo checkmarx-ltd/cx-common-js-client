@@ -36,6 +36,7 @@ import { PolicyRule } from "../../dto/api/PolicyRule";
 
 import { config } from "process";
 import { SastClient } from "./sastClient";
+import { SpawnScaResolver } from "./SpawnScaResolver";
 const fs = require('fs');
 ;/**
  * SCA - Software Composition Analysis - is the successor of OSA.
@@ -43,7 +44,9 @@ const fs = require('fs');
 export class ScaClient {
     public static readonly TENANT_HEADER_NAME: string = "Account-Name";
     public static readonly AUTHENTICATION: string = "identity/connect/token";
-
+    public static readonly TEMP_FILE_NAME_TO_SCA_RESOLVER_RESULTS_ZIP: string = "ScaResolverResults";
+    public static readonly SCA_RESOLVER_RESULT_FILE_NAME: string = ".cxsca-results.json";
+    
     private static readonly RISK_MANAGEMENT_API: string = "/risk-management/";
     private static readonly PROJECTS: string = ScaClient.RISK_MANAGEMENT_API + "projects";
     private static readonly SUMMARY_REPORT: string = ScaClient.RISK_MANAGEMENT_API + "riskReports/%s/summary";
@@ -64,6 +67,7 @@ export class ScaClient {
     private static DEFAULT_FINGERPRINT_FILENAME = 'CxSCAFingerprints.json';
     private projectId: string = '';
     private scanId: string = '';
+    private static tempUploadFile:string;
 
     private readonly stopwatch = new Stopwatch();
     private static readonly pollingSettings: PollingSettings = {
@@ -233,7 +237,15 @@ export class ScaClient {
             if (fingerprintsFilePath) {
                 filePathFiltersOr.push(new FilePathFilter(ScaClient.FINGERPRINT_FILE_NAME, ''));
             }
-        } else if (this.config.fingerprintsFilePath) {
+        }else if(this.config.isEnableScaResolver && ScaClient.tempUploadFile !=undefined ){
+            this.log.info("Deleting uploaded file for scan " + ScaClient.tempUploadFile);
+
+                if(await fs.unlink(ScaClient.tempUploadFile))
+                {
+                    this.log.error("Error while deleting uploaded file for scan "+ ScaClient.tempUploadFile);
+                }
+
+        }else if (this.config.fingerprintsFilePath) {
             throw Error('Conflicting config properties, can\'t save fingerprint file when includeSource flag is set to true.');
         } else {
             this.log.info("Using local directory flow.");
@@ -259,6 +271,44 @@ export class ScaClient {
         return await this.sendStartScanRequest(SourceLocationType.LOCAL_DIRECTORY, uploadedArchiveUrl);
     }
 
+     /**
+     * This method
+     *  1) executes sca resolver to generate result json file.
+     *  2) create ScaResolverResultsxxxx.zip file with sca resolver result json file to be uploaded for scan
+     *  3) Execute initiateScan method to generate SCA scan.
+     * @param scaConfig - AST Sca config object
+     * @return - Returns the response
+     * @throws IOException
+     */
+
+     private async submitScaResolverEvidenceFile(config:ScaConfig ):Promise<ScanResults>{
+        this.log.info("Executing SCA Resolver flow.");
+    	this.log.info("Path to Sca Resolver: " + config.pathToScaResolver);
+    	this.log.info("Sca Resolver Additional Parameters: " + config.scaResolverAddParameters);
+        let pathToResultJSONFile:string;
+        let zipFile:string;
+        pathToResultJSONFile = this.getScaResolverResultFilePathFromAdditionalParams(config.scaResolverAddParameters);
+        let exitCode :number = SpawnScaResolver.runScaResolver(config.pathToScaResolver, config.scaResolverAddParameters,pathToResultJSONFile);
+        if (exitCode == 0) {
+            this.log.info("Sca Resolver Evidence File Generated.");
+            this.log.info("Path of Evidence File" + pathToResultJSONFile);
+            let resultFilePath :string = pathToResultJSONFile;
+            zipFile = this.zipEvidenceFile(resultFilePath);
+
+        }else{
+            throw Error("Error while running sca resolver executable.");
+        }
+        return initiateScanForUpload(this.projectId, zipFile, this.config.ScaConfig());
+    }
+    zipEvidenceFile(resultFilePath:string):string{
+        return'';
+    }
+
+     getScaResolverResultFilePathFromAdditionalParams(scaResolverAddParams:string): string{
+         return '';
+
+
+     }
     private async copyConfigFileToSourceDir(sourceLocation: string) {
         let arrayOfConfigFilePath = this.config.configFilePaths;
         let format = /[!@#$%^&*()+\-=\[\]{};':"\\|,<>\/?]+/;

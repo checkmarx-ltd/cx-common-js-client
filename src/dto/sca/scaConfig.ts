@@ -29,4 +29,7 @@ export interface ScaConfig {
     scaSastTeam:string;
     isExploitable:boolean;
     cacert_chainFilePath: string;
+    isEnableScaResolver: boolean ;
+    pathToScaResolver: string;
+    scaResolverAddParameters: string;
 }
