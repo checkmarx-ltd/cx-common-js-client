@@ -57,6 +57,12 @@ export class SCAWaiter {
                     } else {
                         resolve(response);
                     }
+                }).catch(err => {
+                    let response = new ScanInfoResponse();
+                    response.id = "Failed";
+                    response.status = ScanStatus.FAILED;
+                    this.log.error("Error occured while checking scan status.\n" + err);
+                    resolve(response);
                 });
         });
     }
