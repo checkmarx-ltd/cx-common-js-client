@@ -172,7 +172,10 @@ export class ScaClient {
             let response: any;
             if (locationType === SourceLocationType.REMOTE_REPOSITORY) {
                 response = await this.submitSourceFromRemoteRepo();
-            } else {
+            } else if(this.config.isEnableScaResolver){
+                response = await this.submitScaResolverEvidenceFile();
+                
+            }else {
                 response = await this.submitSourceFromLocalDir();
             }
 
@@ -281,32 +284,57 @@ export class ScaClient {
      * @throws IOException
      */
 
-     private async submitScaResolverEvidenceFile(config:ScaConfig ):Promise<ScanResults>{
-        this.log.info("Executing SCA Resolver flow.");
-    	this.log.info("Path to Sca Resolver: " + config.pathToScaResolver);
-    	this.log.info("Sca Resolver Additional Parameters: " + config.scaResolverAddParameters);
+     private async submitScaResolverEvidenceFile() : Promise<any>{
+    	this.log.info("SCA resolution completed successfully.");
+    	this.log.info("Sca Resolver Additional Parameters: " + this.config.scaResolverAddParameters);
         let pathToResultJSONFile:string;
         let zipFile:string;
-        pathToResultJSONFile = this.getScaResolverResultFilePathFromAdditionalParams(config.scaResolverAddParameters);
-        let exitCode :number = SpawnScaResolver.runScaResolver(config.pathToScaResolver, config.scaResolverAddParameters,pathToResultJSONFile);
+        pathToResultJSONFile = this.getScaResolverResultFilePathFromAdditionalParams(this.config.scaResolverAddParameters);
+        this.log.info("Path to the evidence file" + pathToResultJSONFile);
+        let exitCode;
+        await SpawnScaResolver.runScaResolver(this.config.pathToScaResolver, this.config.scaResolverAddParameters,pathToResultJSONFile).then(res => {
+            exitCode = res;
+          })
         if (exitCode == 0) {
             this.log.info("Sca Resolver Evidence File Generated.");
             this.log.info("Path of Evidence File" + pathToResultJSONFile);
             let resultFilePath :string = pathToResultJSONFile;
-            zipFile = this.zipEvidenceFile(resultFilePath);
-
+           // zipFile = this.zipEvidenceFile(resultFilePath);
+            await this.zipEvidenceFile(resultFilePath).then(res => {
+                zipFile = res;
+              })
         }else{
-            throw Error("Error while running sca resolver executable.");
+            throw Error("Error while running sca resolver executable. Exit code:"+exitCode);
         }
-        return initiateScanForUpload(this.projectId, zipFile, this.config.ScaConfig());
+        this.log.info('Uploading the zipped data...');
+        const uploadedArchiveUrl: string = await this.getSourceUploadUrl();
+        await this.uploadToAWS(uploadedArchiveUrl, ScaClient.tempUploadFile);
+        await this.deleteZip(ScaClient.tempUploadFile);
+        return await this.sendStartScanRequest(SourceLocationType.LOCAL_DIRECTORY, uploadedArchiveUrl);
     }
-    zipEvidenceFile(resultFilePath:string):string{
-        return'';
+   async zipEvidenceFile(resultFilePath:string):Promise<string>{
+        const tempFilename = tmpNameSync({ prefix: 'ScaResolverResults', postfix: '.zip' });
+        this.log.debug(`Zipping source code at ${resultFilePath} into file ${tempFilename}`);
+        const zipper = new Zipper(this.log);
+        const zipResult = await zipper.zipDirectory(resultFilePath, tempFilename);
+        if (zipResult.fileCount === 0) {
+            throw new TaskSkippedError('Zip file is empty: no source to scan');
+        }
+        ScaClient.tempUploadFile= tempFilename;
+
+        return tempFilename;
     }
 
      getScaResolverResultFilePathFromAdditionalParams(scaResolverAddParams:string): string{
-         return '';
-
+        let argument: Array<string>;
+        let pathToEvidenceDir :string = ""; 
+        argument = scaResolverAddParams.split(" ");
+        for (let i = 0; i <  argument.length ; i++) {
+            if (argument[i] == ("-r") )
+                pathToEvidenceDir =  argument[i+1];
+        }
+        let pathToEvidenceFile = pathToEvidenceDir + path.sep + ".cxsca-results.json";
+        return pathToEvidenceFile;
 
      }
     private async copyConfigFileToSourceDir(sourceLocation: string) {
