@@ -296,8 +296,7 @@ export class ScaClient {
             exitCode = res;
           })
         if (exitCode == 0) {
-            this.log.info("Sca Resolver Evidence File Generated.");
-            this.log.info("Path of Evidence File" + pathToResultJSONFile);
+            this.log.info("SCA resolution completed successfully.");  
             let resultFilePath :string = pathToResultJSONFile;
            // zipFile = this.zipEvidenceFile(resultFilePath);
             await this.zipEvidenceFile(resultFilePath).then(res => {
