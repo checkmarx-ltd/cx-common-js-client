@@ -240,14 +240,6 @@ export class ScaClient {
             if (fingerprintsFilePath) {
                 filePathFiltersOr.push(new FilePathFilter(ScaClient.FINGERPRINT_FILE_NAME, ''));
             }
-        }else if(this.config.isEnableScaResolver && ScaClient.tempUploadFile !=undefined ){
-            this.log.info("Deleting uploaded file for scan " + ScaClient.tempUploadFile);
-
-                if(await fs.unlink(ScaClient.tempUploadFile))
-                {
-                    this.log.error("Error while deleting uploaded file for scan "+ ScaClient.tempUploadFile);
-                }
-
         }else if (this.config.fingerprintsFilePath) {
             throw Error('Conflicting config properties, can\'t save fingerprint file when includeSource flag is set to true.');
         } else {
@@ -312,7 +304,7 @@ export class ScaClient {
         return await this.sendStartScanRequest(SourceLocationType.LOCAL_DIRECTORY, uploadedArchiveUrl);
     }
    async zipEvidenceFile(resultFilePath:string):Promise<string>{
-        const tempFilename = tmpNameSync({ prefix: 'ScaResolverResults', postfix: '.zip' });
+        const tempFilename = tmpNameSync({ prefix: ScaClient.TEMP_FILE_NAME_TO_SCA_RESOLVER_RESULTS_ZIP, postfix: '.zip' });
         this.log.debug(`Zipping source code at ${resultFilePath} into file ${tempFilename}`);
         const zipper = new Zipper(this.log);
         const zipResult = await zipper.zipDirectory(resultFilePath, tempFilename);
@@ -332,7 +324,7 @@ export class ScaClient {
             if (argument[i] == ("-r") )
                 pathToEvidenceDir =  argument[i+1];
         }
-        let pathToEvidenceFile = pathToEvidenceDir + path.sep + ".cxsca-results.json";
+        let pathToEvidenceFile = pathToEvidenceDir + path.sep + ScaClient.SCA_RESOLVER_RESULT_FILE_NAME;
         return pathToEvidenceFile;
 
      }
