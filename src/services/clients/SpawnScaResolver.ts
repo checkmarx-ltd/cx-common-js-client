@@ -1,5 +1,5 @@
 import * as path from "path";
-import { exec, execFile, fork, spawn } from "child_process";
+import {spawn } from "child_process";
 
 
 export class SpawnScaResolver {
@@ -13,7 +13,7 @@ export class SpawnScaResolver {
 	 * @param scaResolverAddParams - Additional parameters for SCA resolver
 	 * @return
 	 */
-     static async runScaResolver(pathToScaResolver:String, scaResolverAddParams: string,pathToResultJSONFile:string ):Promise<number> {
+     static async runScaResolver(pathToScaResolver:string, scaResolverAddParams: string,pathToResultJSONFile:string ):Promise<number> {
       let exitCode:number = -100;
       let scaResolverCommand: string;
       let argument: Array<string>;
@@ -36,7 +36,6 @@ export class SpawnScaResolver {
         if(arg=="-r")
         {
             scaResolverCommand =scaResolverCommand + " " + pathToResultJSONFile;
-            i++;
         }
     }
 

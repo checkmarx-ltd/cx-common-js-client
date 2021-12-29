@@ -290,7 +290,6 @@ export class ScaClient {
         if (exitCode == 0) {
             this.log.info("SCA resolution completed successfully.");  
             let resultFilePath :string = pathToResultJSONFile;
-           // zipFile = this.zipEvidenceFile(resultFilePath);
             await this.zipEvidenceFile(resultFilePath).then(res => {
                 zipFile = res;
               })
@@ -324,8 +323,7 @@ export class ScaClient {
             if (argument[i] == ("-r") )
                 pathToEvidenceDir =  argument[i+1];
         }
-        let pathToEvidenceFile = pathToEvidenceDir + path.sep + ScaClient.SCA_RESOLVER_RESULT_FILE_NAME;
-        return pathToEvidenceFile;
+        return pathToEvidenceDir + path.sep + ScaClient.SCA_RESOLVER_RESULT_FILE_NAME;
 
      }
     private async copyConfigFileToSourceDir(sourceLocation: string) {
