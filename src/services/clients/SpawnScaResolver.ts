@@ -22,8 +22,8 @@ export class SpawnScaResolver {
       argument = scaResolverAddParams.split(" ");
       scaResolverCommand = pathToScaResolver + path.sep + SpawnScaResolver.SCA_RESOLVER_EXE;
       scaResolverCommand = scaResolverCommand + " " + SpawnScaResolver.OFFLINE;
-      for  (let i:number = 0 ; i < argument.length ; i++){
-        let arg: string  = argument[i];
+      for  (let val of argument){
+        let arg: string  = val;
         if(arg=="debug")
         {
             arg = "Debug";

@@ -280,7 +280,6 @@ export class ScaClient {
     	this.log.info("SCA resolution completed successfully.");
     	this.log.info("Sca Resolver Additional Parameters: " + this.config.scaResolverAddParameters);
         let pathToResultJSONFile:string;
-        let zipFile:string;
         pathToResultJSONFile = this.getScaResolverResultFilePathFromAdditionalParams(this.config.scaResolverAddParameters);
         this.log.info("Path to the evidence file" + pathToResultJSONFile);
         let exitCode;
@@ -290,9 +289,7 @@ export class ScaClient {
         if (exitCode == 0) {
             this.log.info("SCA resolution completed successfully.");  
             let resultFilePath :string = pathToResultJSONFile;
-            await this.zipEvidenceFile(resultFilePath).then(res => {
-                zipFile = res;
-              })
+            await this.zipEvidenceFile(resultFilePath);
         }else{
             throw Error("Error while running sca resolver executable. Exit code:"+exitCode);
         }
@@ -300,7 +297,7 @@ export class ScaClient {
         const uploadedArchiveUrl: string = await this.getSourceUploadUrl();
         await this.uploadToAWS(uploadedArchiveUrl, ScaClient.tempUploadFile);
         await this.deleteZip(ScaClient.tempUploadFile);
-        return await this.sendStartScanRequest(SourceLocationType.LOCAL_DIRECTORY, uploadedArchiveUrl);
+        return this.sendStartScanRequest(SourceLocationType.LOCAL_DIRECTORY, uploadedArchiveUrl);
     }
    async zipEvidenceFile(resultFilePath:string):Promise<string>{
         const tempFilename = tmpNameSync({ prefix: ScaClient.TEMP_FILE_NAME_TO_SCA_RESOLVER_RESULTS_ZIP, postfix: '.zip' });
