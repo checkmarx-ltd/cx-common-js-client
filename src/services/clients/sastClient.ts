@@ -177,6 +177,15 @@ export class SastClient {
                     } else {
                         resolve(scanStatus);
                     }
+                }).catch(err => {
+                    const scanStatus: ScanStatus = {
+                        stage: { value : ScanStage.Failed },
+                        stageDetails: "Error occured while checking scan status.",
+                        totalPercent: 0
+
+                    }
+                    this.log.error("Error occured while checking scan status.\n" + err);
+                    resolve(scanStatus);
                 });
         });
     };
