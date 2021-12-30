@@ -67,7 +67,6 @@ export class ScaClient {
     private static DEFAULT_FINGERPRINT_FILENAME = 'CxSCAFingerprints.json';
     private projectId: string = '';
     private scanId: string = '';
-    private static tempUploadFile:string;
 
     private readonly stopwatch = new Stopwatch();
     private static readonly pollingSettings: PollingSettings = {
@@ -317,8 +316,11 @@ export class ScaClient {
         let pathToEvidenceDir :string = ""; 
         argument = scaResolverAddParams.split(" ");
         for (let i = 0; i <  argument.length ; i++) {
-            if (argument[i] == ("-r") )
+            if (argument[i] == ("-r") ){
                 pathToEvidenceDir =  argument[i+1];
+                break;
+            }
+                
         }
         return pathToEvidenceDir + path.sep + ScaClient.SCA_RESOLVER_RESULT_FILE_NAME;
 

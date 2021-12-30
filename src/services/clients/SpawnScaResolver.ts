@@ -54,7 +54,7 @@ export class SpawnScaResolver {
         }
         
     }catch(err){
-        throw Error(`SCA Resolver process is not working`);
+        throw Error(`Error occurred while running SCA Resolver.`+err);
     }
     return exitCode;    
 }
