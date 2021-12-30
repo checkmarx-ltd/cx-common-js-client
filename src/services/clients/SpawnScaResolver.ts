@@ -22,8 +22,8 @@ export class SpawnScaResolver {
       argument = scaResolverAddParams.split(" ");
       scaResolverCommand = pathToScaResolver + path.sep + SpawnScaResolver.SCA_RESOLVER_EXE;
       scaResolverCommand = scaResolverCommand + " " + SpawnScaResolver.OFFLINE;
-      for  (let val of argument){
-        let arg: string  = val;
+      for(let i=0; i<argument.length;i++){
+        let arg: string  = argument[i];
         if(arg=="debug")
         {
             arg = "Debug";
@@ -35,9 +35,13 @@ export class SpawnScaResolver {
         scaResolverCommand = scaResolverCommand + " " + arg;
         if(arg=="-r")
         {
-            scaResolverCommand =scaResolverCommand + " " + pathToResultJSONFile;
+            scaResolverCommand =scaResolverCommand + " " +pathToResultJSONFile;
+            i=i+1;
         }
-    }
+        
+
+      }
+
 
     try{
         const child = spawn(scaResolverCommand, [''], {shell: true});
@@ -50,7 +54,7 @@ export class SpawnScaResolver {
         }
         
     }catch(err){
-        throw Error(`Spawn process not working`);
+        throw Error(`SCA Resolver process is not working`);
     }
     return exitCode;    
 }

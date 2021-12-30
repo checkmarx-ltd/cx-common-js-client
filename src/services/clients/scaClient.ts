@@ -277,7 +277,6 @@ export class ScaClient {
      */
 
      private async submitScaResolverEvidenceFile() : Promise<any>{
-    	this.log.info("SCA resolution completed successfully.");
     	this.log.info("Sca Resolver Additional Parameters: " + this.config.scaResolverAddParameters);
         let pathToResultJSONFile:string;
         pathToResultJSONFile = this.getScaResolverResultFilePathFromAdditionalParams(this.config.scaResolverAddParameters);
@@ -286,17 +285,20 @@ export class ScaClient {
         await SpawnScaResolver.runScaResolver(this.config.pathToScaResolver, this.config.scaResolverAddParameters,pathToResultJSONFile).then(res => {
             exitCode = res;
           })
+          let zipFile:string='';
         if (exitCode == 0) {
             this.log.info("SCA resolution completed successfully.");  
             let resultFilePath :string = pathToResultJSONFile;
-            await this.zipEvidenceFile(resultFilePath);
+            await this.zipEvidenceFile(resultFilePath).then(res => {
+                zipFile = res;
+              })
         }else{
             throw Error("Error while running sca resolver executable. Exit code:"+exitCode);
         }
         this.log.info('Uploading the zipped data...');
         const uploadedArchiveUrl: string = await this.getSourceUploadUrl();
-        await this.uploadToAWS(uploadedArchiveUrl, ScaClient.tempUploadFile);
-        await this.deleteZip(ScaClient.tempUploadFile);
+        await this.uploadToAWS(uploadedArchiveUrl, zipFile);
+        await this.deleteZip(zipFile);
         return this.sendStartScanRequest(SourceLocationType.LOCAL_DIRECTORY, uploadedArchiveUrl);
     }
    async zipEvidenceFile(resultFilePath:string):Promise<string>{
@@ -307,8 +309,6 @@ export class ScaClient {
         if (zipResult.fileCount === 0) {
             throw new TaskSkippedError('Zip file is empty: no source to scan');
         }
-        ScaClient.tempUploadFile= tempFilename;
-
         return tempFilename;
     }
 
