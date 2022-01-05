@@ -137,6 +137,9 @@ export class CxClient {
     private async createSASTScan(scanResult: ScanResults): Promise<ScanResults> {
         this.log.info('-----------------------------------Create CxSAST Scan:-----------------------------------');
         const runScanWithSettings: boolean = await this.isScanWithSettingsSupported() as boolean;
+        if(this.sastConfig.projectCustomFields){
+            await this.updateProjectCustomFields();
+        }
         if (runScanWithSettings) {
             this.log.debug('start scan with scanWithSettings');
             const scanResponse: ScanWithSettingsResponse = await this.scanWithSetting() as ScanWithSettingsResponse;
@@ -153,6 +156,44 @@ export class CxClient {
         this.log.info('Scan id ' + scanResult.scanId);
 
         return scanResult;
+    }
+
+    async updateProjectCustomFields(): Promise<void> {
+        this.log.info("Updating Project Custom Fields.");
+        let projectId = this.projectId;
+        let path = `projects/${projectId}`;
+
+        //reading project custom fields entered by user on UI.
+        const projectCustomFields = this.sastConfig.projectCustomFields.split(",");
+        const projectCustomFieldsIds = new Array<string>(projectCustomFields.length);
+        const projectCustomFieldsKeys = new Array<string>(projectCustomFields.length);
+        const projectCustomFieldsValues = new Array<string>(projectCustomFields.length);
+        for (var i = 0; i < projectCustomFields.length; i++) {
+            projectCustomFieldsKeys[i] = projectCustomFields[i].split(":")[0];
+            projectCustomFieldsValues[i] = projectCustomFields[i].split(":")[1];
+        }
+
+        //reading project custom fields stored in SAST Portal
+        const fetchSASTProjectCustomFields = await this.httpClient.getRequest('customFields',{});
+        for (var i = 0; i < projectCustomFieldsKeys.length; i++){
+            for (var j = 0; j < fetchSASTProjectCustomFields.length; j++) {
+                if(projectCustomFieldsKeys[i] === fetchSASTProjectCustomFields[j].name){
+                    projectCustomFieldsIds[i] = fetchSASTProjectCustomFields[j].id;
+                }
+            }
+        }     
+        let customField = {};
+        let temp_customFields = []
+        for (var i=0; i < projectCustomFieldsIds.length; i++ ) {
+            customField = {"id":parseInt(projectCustomFieldsIds[i]),"value":projectCustomFieldsValues[i]};
+            temp_customFields.push(customField);
+        }
+                
+        const scanResponse: ScanWithSettingsResponse = await this.httpClient.putRequest(path, {
+            name: this.config.projectName,
+            owningTeam: this.teamId,
+            customFields: temp_customFields
+        });
     }
 
     async isScanWithSettingsSupported(): Promise<boolean> {
