@@ -185,8 +185,13 @@ export class CxClient {
         let customField = {};
         let temp_customFields = []
         for (var i=0; i < projectCustomFieldsIds.length; i++ ) {
-            customField = {"id":parseInt(projectCustomFieldsIds[i]),"value":projectCustomFieldsValues[i]};
-            temp_customFields.push(customField);
+            if( isNaN( parseInt(projectCustomFieldsIds[i]) ) ){
+                this.log.warning(`Could not update '${projectCustomFieldsKeys[i]}'. Custom Field does not exist.`);
+            }
+            else {
+                customField = {"id":parseInt(projectCustomFieldsIds[i]),"value":projectCustomFieldsValues[i]};
+                temp_customFields.push(customField);
+            }
         }
                 
         const scanResponse: ScanWithSettingsResponse = await this.httpClient.putRequest(path, {
