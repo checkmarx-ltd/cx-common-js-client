@@ -407,28 +407,28 @@ Scan results location:  ${result.sastScanResultsLink}
 `);
     }
 
-    private static toJsonQueries(result: ScanResults, queries: any[] | undefined) {
+    private static toJsonQueries(scanResult: ScanResults, queries: any[] | undefined) {
         var results, severity;
         if(queries){
-            for(var query = 0 ; query < queries.length ; query++) 
+            for(var query of queries) 
             {
-                results = queries[query].Result;
-                for(var r = 0 ; r < results.length ; r++) {
-                    if(results[r].$.FalsePositive === "False"){
-                        if(results[r].$.Status === "New"){
-                            severity = results[r].$.Severity;
+                results = query.Result;
+                for(var result of results) {
+                    if(result.$.FalsePositive === "False"){
+                        if(result.$.Status === "New"){
+                            severity = result.$.Severity;
                             switch(severity){
                                 case "High":
-                                    result.newHighCount++;
+                                    scanResult.newHighCount++;
                                     break;
                                 case "Medium":
-                                    result.newMediumCount++;
+                                    scanResult.newMediumCount++;
                                     break;
                                 case "Low":
-                                    result.newLowCount++;
+                                    scanResult.newLowCount++;
                                     break;
                                 case "Information":
-                                    result.newInfoCount++;
+                                    scanResult.newInfoCount++;
                                     break;
                             }
                         }
