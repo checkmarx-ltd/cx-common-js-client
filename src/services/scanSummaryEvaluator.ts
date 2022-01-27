@@ -1,6 +1,7 @@
 import { ThresholdError } from "../dto/thresholdError";
 import { ScanSummary } from "../dto/scanSummary";
 import { SCAResults } from "../dto/sca/scaResults";
+import { NewVulnerabilitiesThresholdError } from "../dto/newVulnerabilitiesThresholdError";
 
 export abstract class ScanSummaryEvaluator {
     /**
@@ -43,5 +44,47 @@ export abstract class ScanSummaryEvaluator {
                 });
             }
         }
+    }
+
+    protected static getNewVulnerabilitiesThresholdErrors(scanResult: any, config: any){
+        let result: NewVulnerabilitiesThresholdError[];
+        if(config.failBuildForNewVulnerabilitiesEnabled){
+            result = ScanSummaryEvaluator.getSastNewVulnerabilitiesThresholdErrors(scanResult, config)
+        }
+        else{
+            result = [];
+        }
+        return result;
+    }
+
+    private static getSastNewVulnerabilitiesThresholdErrors(scanResult: any, config: any) {
+        const result: NewVulnerabilitiesThresholdError[] = [];
+        var severity = config.failBuildForNewVulnerabilitiesSeverity;
+
+        if(severity === "LOW"){
+            if(scanResult.newLowCount > 0){
+                result.push({
+                    severity, 
+                    severityCount: scanResult.newLowCount
+                });
+            }
+            severity = "MEDIUM";
+        }
+        if(severity === "MEDIUM"){
+            if(scanResult.newMediumCount > 0){
+                result.push({
+                    severity, 
+                    severityCount: scanResult.newMediumCount
+                });
+            }
+            severity = "HIGH";
+        }
+        if(severity === "HIGH" && scanResult.newHighCount > 0){
+            result.push({
+                severity, 
+                severityCount: scanResult.newHighCount
+            });            
+        }
+        return result;
     }
 }

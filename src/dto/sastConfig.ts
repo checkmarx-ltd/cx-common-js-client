@@ -16,6 +16,8 @@ export interface SastConfig {
     scanTimeoutInMinutes?: number;
     enablePolicyViolations: boolean;
     vulnerabilityThreshold: boolean;
+    failBuildForNewVulnerabilitiesEnabled: boolean;
+    failBuildForNewVulnerabilitiesSeverity: string;
     highThreshold?: number;
     mediumThreshold?: number;
     lowThreshold?: number;
