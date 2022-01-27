@@ -177,9 +177,9 @@ export class CxClient {
         //reading project custom fields stored in SAST Portal
         const fetchSASTProjectCustomFields = await this.httpClient.getRequest('customFields',{});
         for (let i = 0; i < projectCustomFieldsKeys.length; i++){
-            for (var j = 0; j < fetchSASTProjectCustomFields.length; j++) {
-                if(projectCustomFieldsKeys[i] === fetchSASTProjectCustomFields[j].name){
-                    projectCustomFieldsIds[i] = fetchSASTProjectCustomFields[j].id;
+            for(let fetchSASTProjectCustomField of fetchSASTProjectCustomFields){
+                if(projectCustomFieldsKeys[i] === fetchSASTProjectCustomField.name){
+                    projectCustomFieldsIds[i] = fetchSASTProjectCustomField.id;
                 }
             }
         }     
@@ -195,7 +195,7 @@ export class CxClient {
             }
         }
                 
-        const scanResponse: ScanWithSettingsResponse = await this.httpClient.putRequest(path, {
+        await this.httpClient.putRequest(path, {
             name: this.config.projectName,
             owningTeam: this.teamId,
             customFields: temp_customFields
