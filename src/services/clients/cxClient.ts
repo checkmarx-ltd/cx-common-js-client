@@ -169,14 +169,14 @@ export class CxClient {
         const projectCustomFieldsIds = new Array<string>(projectCustomFields.length);
         const projectCustomFieldsKeys = new Array<string>(projectCustomFields.length);
         const projectCustomFieldsValues = new Array<string>(projectCustomFields.length);
-        for (var i = 0; i < projectCustomFields.length; i++) {
+        for (let i = 0; i < projectCustomFields.length; i++) {
             projectCustomFieldsKeys[i] = projectCustomFields[i].split(":")[0];
             projectCustomFieldsValues[i] = projectCustomFields[i].split(":")[1];
         }
 
         //reading project custom fields stored in SAST Portal
         const fetchSASTProjectCustomFields = await this.httpClient.getRequest('customFields',{});
-        for (var i = 0; i < projectCustomFieldsKeys.length; i++){
+        for (let i = 0; i < projectCustomFieldsKeys.length; i++){
             for (var j = 0; j < fetchSASTProjectCustomFields.length; j++) {
                 if(projectCustomFieldsKeys[i] === fetchSASTProjectCustomFields[j].name){
                     projectCustomFieldsIds[i] = fetchSASTProjectCustomFields[j].id;
@@ -185,7 +185,7 @@ export class CxClient {
         }     
         let customField = {};
         let temp_customFields = []
-        for (var i=0; i < projectCustomFieldsIds.length; i++ ) {
+        for (let i=0; i < projectCustomFieldsIds.length; i++ ) {
             if( isNaN( parseInt(projectCustomFieldsIds[i]) ) ){
                 this.log.warning(`Could not update '${projectCustomFieldsKeys[i]}'. Custom Field does not exist.`);
             }
