@@ -44,6 +44,10 @@ export class ScanResults {
     mediumResults = 0;
     lowResults = 0;
     infoResults = 0;
+    newHighCount = 0;
+    newMediumCount = 0;
+    newLowCount = 0;
+    newInfoCount = 0;
 
     sastScanResultsLink = '';
     sastSummaryResultsLink = '';

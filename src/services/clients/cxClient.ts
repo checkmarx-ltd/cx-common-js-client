@@ -20,6 +20,7 @@ import { SastConfig } from '../../dto/sastConfig';
 import { ScaConfig } from '../../dto/sca/scaConfig';
 import { ScanWithSettingsResponse } from "../../dto/api/scanWithSettingsResponse";
 import { SCAResults } from "../../dto/sca/scaResults";
+import { NewVulnerabilitiesThresholdError } from "../../dto/newVulnerabilitiesThresholdError";
 const fs = require('fs');
 
 /**
@@ -163,6 +164,9 @@ export class CxClient {
     private async createSASTScan(scanResult: ScanResults): Promise<ScanResults> {
         this.log.info('-----------------------------------Create CxSAST Scan:-----------------------------------');
         const runScanWithSettings: boolean = await this.isScanWithSettingsSupported() as boolean;
+        if(this.sastConfig.projectCustomFields){
+            await this.updateProjectCustomFields();
+        }
         if (runScanWithSettings) {
             this.log.debug('start scan with scanWithSettings');
             const scanResponse: ScanWithSettingsResponse = await this.scanWithSetting() as ScanWithSettingsResponse;
@@ -181,6 +185,49 @@ export class CxClient {
         return scanResult;
     }
 
+    async updateProjectCustomFields(): Promise<void> {
+        this.log.info("Updating Project Custom Fields.");
+        let projectId = this.projectId;
+        let path = `projects/${projectId}`;
+
+        //reading project custom fields entered by user on UI.
+        const projectCustomFields = this.sastConfig.projectCustomFields.split(",");
+        const projectCustomFieldsIds = new Array<string>(projectCustomFields.length);
+        const projectCustomFieldsKeys = new Array<string>(projectCustomFields.length);
+        const projectCustomFieldsValues = new Array<string>(projectCustomFields.length);
+        for (let i = 0; i < projectCustomFields.length; i++) {
+            projectCustomFieldsKeys[i] = projectCustomFields[i].split(":")[0];
+            projectCustomFieldsValues[i] = projectCustomFields[i].split(":")[1];
+        }
+
+        //reading project custom fields stored in SAST Portal
+        const fetchSASTProjectCustomFields = await this.httpClient.getRequest('customFields',{});
+        for (let i = 0; i < projectCustomFieldsKeys.length; i++){
+            for(let fetchSASTProjectCustomField of fetchSASTProjectCustomFields){
+                if(projectCustomFieldsKeys[i] === fetchSASTProjectCustomField.name){
+                    projectCustomFieldsIds[i] = fetchSASTProjectCustomField.id;
+                }
+            }
+        }     
+        let customField = {};
+        let temp_customFields = []
+        for (let i=0; i < projectCustomFieldsIds.length; i++ ) {
+            if( isNaN( parseInt(projectCustomFieldsIds[i]) ) ){
+                this.log.warning(`Could not update '${projectCustomFieldsKeys[i]}'. Custom Field does not exist.`);
+            }
+            else {
+                customField = {"id":parseInt(projectCustomFieldsIds[i]),"value":projectCustomFieldsValues[i]};
+                temp_customFields.push(customField);
+            }
+        }
+                
+        await this.httpClient.putRequest(path, {
+            name: this.config.projectName,
+            owningTeam: this.teamId,
+            customFields: temp_customFields
+        });
+    }
+
     async isScanWithSettingsSupported(): Promise<boolean> {
         try {
             const swaggerResponse = await this.httpClient.getRequest(this.swaggerLocation, { suppressWarnings: true })
@@ -196,12 +243,12 @@ export class CxClient {
 
         await this.sastClient.waitForScanToFinish();
 
-        await this.addStatisticsToScanResults(result);
+        await this.addStatisticsToScanResults(result); //setting sastconfig properties to result
         await this.addPolicyViolationsToScanResults(result);
 
-        this.printStatistics(result);
+        await this.addDetailedReportToScanResults(result); //setting newSeverities
 
-        await this.addDetailedReportToScanResults(result);
+        this.printStatistics(result); //this line of code needs to be moved below addDetailedReportToScanResults
 
         const evaluator = new SastSummaryEvaluator(this.sastConfig, this.isPolicyEnforcementSupported);
         const summary = evaluator.getScanSummary(result);
@@ -405,7 +452,7 @@ export class CxClient {
         result.scanTime = doc.$.ScanTime;
         result.locScanned = doc.$.LinesOfCodeScanned;
         result.filesScanned = doc.$.FilesScanned;
-        result.queryList = CxClient.toJsonQueries(doc.Query);
+        result.queryList = CxClient.toJsonQueries(result, doc.Query);
 
         // TODO: PowerShell code also adds properties such as newHighCount, but they are not used in the UI.
     }
@@ -417,18 +464,46 @@ export class CxClient {
     }
 
     private printStatistics(result: ScanResults) {
+        const newHigh = result.newHighCount > 0 ? " (" + result.newHighCount + " new)" : "";
+        const newMedium = result.newMediumCount > 0 ? " (" + result.newMediumCount + " new)" : "";
+        const newLow = result.newLowCount > 0 ? " (" + result.newLowCount + " new)" : "";
+        const newInfo = result.newInfoCount > 0 ? " (" + result.newInfoCount + " new)" : "";
         this.log.info(`----------------------------Checkmarx Scan Results(CxSAST):-------------------------------
-High severity results: ${result.highResults}
-Medium severity results: ${result.mediumResults}
-Low severity results: ${result.lowResults}
-Info severity results: ${result.infoResults}
+High severity results: ${result.highResults}${newHigh}
+Medium severity results: ${result.mediumResults}${newMedium}
+Low severity results: ${result.lowResults}${newLow}
+Info severity results: ${result.infoResults}${newInfo}
 
 Scan results location:  ${result.sastScanResultsLink}
 ------------------------------------------------------------------------------------------
 `);
     }
 
-    private static toJsonQueries(queries: any[] | undefined) {
+    private static toJsonQueries(scanResult: ScanResults, queries: any[]) {
+        var results, severity;
+        for(var query of queries) 
+        {
+            results = query.Result;
+            for(var result of results) {
+                if(result.$.FalsePositive === "False" && result.$.Status === "New"){
+                    severity = result.$.Severity;
+                    switch(severity){
+                        case "High":
+                            scanResult.newHighCount++;
+                            break;
+                        case "Medium":
+                            scanResult.newMediumCount++;
+                            break;
+                        case "Low":
+                            scanResult.newLowCount++;
+                            break;
+                        case "Information":
+                            scanResult.newInfoCount++;
+                            break;
+                    }
+                }
+            }
+        }
         const SEPARATOR = ';';
 
         // queries can be undefined if no vulnerabilities were found.
@@ -498,7 +573,7 @@ Scan results location:  ${result.sastScanResultsLink}
         }
     }
 
-    
+//add for new vulnerabilities    
     private logBuildFailure(failure: ScanSummary) {
         this.log.error(
             `********************************************
@@ -506,6 +581,7 @@ The Build Failed for the Following Reasons:
 ********************************************`);
         this.logPolicyCheckError(failure.policyCheck);
         this.logThresholdErrors(failure.thresholdErrors);
+        this.logNewVulnerabilitiesThresholdErrors(failure.newVulnerabilitiesThresholdErrors);
     }
 
     private logPolicyCheckSummary(policyCheck: { wasPerformed: boolean; violatedPolicyNames: string[] }) {
@@ -523,6 +599,15 @@ Policy Management:
                 this.log.info('Project policy status: compliant');
             }
             this.log.info('-----------------------------------------------------------------------------------------');
+        }
+    }
+
+    private logNewVulnerabilitiesThresholdErrors(newVulnerabilitiesThresholdErrors: NewVulnerabilitiesThresholdError[]){
+        if(newVulnerabilitiesThresholdErrors.length){
+            this.log.error('Scan Failed as new SAST vulnerabilities were found');
+            for (const error of newVulnerabilitiesThresholdErrors) {
+                this.log.error(`${error.severityCount} new SAST ${error.severity} severities were found.`);
+            }
         }
     }
 

@@ -17,10 +17,13 @@ export interface SastConfig {
     enablePolicyViolations: boolean;
     generatePDFReport: boolean;
     vulnerabilityThreshold: boolean;
+    failBuildForNewVulnerabilitiesEnabled: boolean;
+    failBuildForNewVulnerabilitiesSeverity: string;
     highThreshold?: number;
     mediumThreshold?: number;
     lowThreshold?: number;
     cacert_chainFilePath: string;
+    projectCustomFields: string;
     customFields: string;
     engineConfigurationId?: number;
     postScanActionName: string;
