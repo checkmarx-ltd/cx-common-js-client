@@ -66,8 +66,7 @@ export class ReportingClient {
     private async getReport(reportId: number) {
         if(this.REPORT_TYPE === "PDF"){
             const reportBytes = await this.httpClient.getRequest(`reports/sastScan/${reportId}`, {blob: true}) as Uint8Array;
-            const reportBuffer = Buffer.from(reportBytes);
-            return reportBuffer;
+            return Buffer.from(reportBytes);
         }
         else{
             const reportBytes = await this.httpClient.getRequest(`reports/sastScan/${reportId}`) as Uint8Array;

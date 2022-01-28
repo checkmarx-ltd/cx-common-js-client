@@ -19,7 +19,6 @@ import { ScaClient } from "./scaClient";
 import { SastConfig } from '../../dto/sastConfig';
 import { ScaConfig } from '../../dto/sca/scaConfig';
 import { ScanWithSettingsResponse } from "../../dto/api/scanWithSettingsResponse";
-import { SCAResults } from "../../dto/sca/scaResults";
 import { NewVulnerabilitiesThresholdError } from "../../dto/newVulnerabilitiesThresholdError";
 const fs = require('fs');
 
@@ -481,10 +480,10 @@ Scan results location:  ${result.sastScanResultsLink}
 
     private static toJsonQueries(scanResult: ScanResults, queries: any[]) {
         var results, severity;
-        for(var query of queries) 
+        for(let query of queries) 
         {
             results = query.Result;
-            for(var result of results) {
+            for(let result of results) {
                 if(result.$.FalsePositive === "False" && result.$.Status === "New"){
                     severity = result.$.Severity;
                     switch(severity){
