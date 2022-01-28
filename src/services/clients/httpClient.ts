@@ -24,12 +24,14 @@ interface InternalRequestOptions extends RequestOptions {
         attachments: { [fieldName: string]: string }
     };
     retry: boolean;
+    blob: boolean;
     customHeaders: any
 }
 
 interface RequestOptions {
     baseUrlOverride?: string;
     suppressWarnings?: boolean;
+    blob?: boolean;
 }
 
 /**
@@ -332,20 +334,20 @@ export class HttpClient {
     }
 
     getRequest(relativePath: string, options?: RequestOptions): Promise<any> {
-        const internalOptions: InternalRequestOptions = { retry: true, method: 'get',customHeaders:{}  };
+        const internalOptions: InternalRequestOptions = { retry: true, method: 'get', blob: false, customHeaders:{}  };
         return this.sendRequest(relativePath, Object.assign(internalOptions, options));
     }
 	
 	patchRequest(relativePath: string, data: object): Promise<any> {
-        return this.sendRequest(relativePath, { singlePostData: data, retry: true, method: 'patch' ,customHeaders:{} });
+        return this.sendRequest(relativePath, { singlePostData: data, retry: true, method: 'patch', blob: false, customHeaders:{} });
     }
 	
     postRequest(relativePath: string, data: object): Promise<any> {
-        return this.sendRequest(relativePath, { singlePostData: data, retry: true, method: 'post',customHeaders:{}  });
+        return this.sendRequest(relativePath, { singlePostData: data, retry: true, method: 'post', blob: false, customHeaders:{}  });
     }
 
     putRequest(relativePath: string, data: object): Promise<any> {
-        return this.sendRequest(relativePath, { singlePostData: data, retry: true, method: 'put',customHeaders:{}  });
+        return this.sendRequest(relativePath, { singlePostData: data, retry: true, method: 'put', blob: false, customHeaders:{}  });
     }
 
     postMultipartRequest(relativePath: string,
@@ -359,6 +361,7 @@ export class HttpClient {
                 attachments
             },
             retry: true,
+            blob: false,
             customHeaders: additionalHeaders
         });
     }
@@ -389,6 +392,10 @@ export class HttpClient {
                 .accept('json')
                 .set('cxOrigin', this.origin)
                 .set('cxOriginUrl',this.originUrl);
+        }
+
+        if(options && options.blob === true){
+            result.responseType("blob");
         }
         
         if(options.customHeaders)

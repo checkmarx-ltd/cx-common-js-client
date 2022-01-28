@@ -5,12 +5,13 @@ import { ReportStatus } from "../../dto/api/reportStatus";
 import { PollingSettings } from "../../dto/pollingSettings";
 import { Stopwatch } from "../stopwatch";
 import * as xml2js from "xml2js";
+const fs = require('fs');
 
 /**
  * Uses Cx API to generate and download XMl reports.
  */
 export class ReportingClient {
-    private static readonly REPORT_TYPE = 'XML';
+    private readonly REPORT_TYPE: any;
 
     private static readonly pollingSettings: PollingSettings = {
         intervalSeconds: 5,
@@ -19,10 +20,11 @@ export class ReportingClient {
 
     private readonly stopwatch = new Stopwatch();
 
-    constructor(private readonly httpClient: HttpClient, private readonly log: Logger) {
+    constructor(private readonly httpClient: HttpClient, private readonly log: Logger, reportType = "XML") {
+        this.REPORT_TYPE = reportType;
     }
 
-    async generateReport(scanId: number, cxOrigin: string | undefined) {
+    async generateReport(scanId: number, cxOrigin: string | undefined, ) {
         const reportId = await this.startReportGeneration(scanId);
         this.log.debug('report ID: ' + reportId);
         await this.waitForReportGenerationToFinish(reportId, cxOrigin);
@@ -32,7 +34,7 @@ export class ReportingClient {
     private async startReportGeneration(scanId: number) {
         const request = {
             scanId: scanId,
-            reportType: ReportingClient.REPORT_TYPE
+            reportType: this.REPORT_TYPE
         };
         const response = await this.httpClient.postRequest('reports/sastScan', request);
         return response.reportId;
@@ -41,7 +43,7 @@ export class ReportingClient {
     private async waitForReportGenerationToFinish(reportId: number, cxOrigin: string | undefined) {
         this.stopwatch.start();
 
-        this.log.info(`Waiting for server to generate ${ReportingClient.REPORT_TYPE} report.`);
+        this.log.info(`Waiting for server to generate ${this.REPORT_TYPE} report.`);
         let lastStatus: ReportStatus;
         try {
             const waiter = new Waiter();
@@ -51,20 +53,27 @@ export class ReportingClient {
                 ReportingClient.pollingSettings
             );
         } catch (e) {
-            throw Error(`Waiting for ${ReportingClient.REPORT_TYPE} report generation has reached the time limit (${ReportingClient.pollingSettings.masterTimeoutMinutes} minutes).`);
+            throw Error(`Waiting for ${this.REPORT_TYPE} report generation has reached the time limit (${ReportingClient.pollingSettings.masterTimeoutMinutes} minutes).`);
         }
 
         if (lastStatus === ReportStatus.Created) {
-            this.log.info(`${ReportingClient.REPORT_TYPE} report was created successfully on server.`);
+            this.log.info(`${this.REPORT_TYPE} report was created successfully on server.`);
         } else {
-            throw Error(`${ReportingClient.REPORT_TYPE} report cannot be generated. Status [${lastStatus}].`);
+            throw Error(`${this.REPORT_TYPE} report cannot be generated. Status [${lastStatus}].`);
         }
     }
 
     private async getReport(reportId: number) {
-        const reportBytes = await this.httpClient.getRequest(`reports/sastScan/${reportId}`) as Uint8Array;
-        const reportBuffer = Buffer.from(reportBytes);
-        return xml2js.parseStringPromise(reportBuffer);
+        if(this.REPORT_TYPE === "PDF"){
+            const reportBytes = await this.httpClient.getRequest(`reports/sastScan/${reportId}`, {blob: true}) as Uint8Array;
+            const reportBuffer = Buffer.from(reportBytes);
+            return reportBuffer;
+        }
+        else{
+            const reportBytes = await this.httpClient.getRequest(`reports/sastScan/${reportId}`) as Uint8Array;
+            const reportBuffer = Buffer.from(reportBytes);
+            return xml2js.parseStringPromise(reportBuffer);
+        }
     }
 
     private delay(ms: number) {
@@ -112,6 +121,6 @@ export class ReportingClient {
         if (secondsLeft < 0) {
             secondsLeft = 0;
         }
-        this.log.info(`Waiting for server to generate ${ReportingClient.REPORT_TYPE} report. ${secondsLeft} seconds left to timeout.`);
+        this.log.info(`Waiting for server to generate ${this.REPORT_TYPE} report. ${secondsLeft} seconds left to timeout.`);
     };
 }
