@@ -22,6 +22,7 @@ export interface SastConfig {
     mediumThreshold?: number;
     lowThreshold?: number;
     cacert_chainFilePath: string;
+    projectCustomFields: string;
     customFields: string;
     engineConfigurationId?: number;
     postScanActionName: string;
