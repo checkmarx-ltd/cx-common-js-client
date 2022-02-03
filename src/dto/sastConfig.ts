@@ -8,6 +8,7 @@ export interface SastConfig {
     denyProject: boolean;
     folderExclusion: string;
     fileExtension: string;
+    overrideProjectSettings: boolean;
     isIncremental: boolean;
     forceScan: boolean;
     comment: string;
