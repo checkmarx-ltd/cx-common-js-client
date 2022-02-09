@@ -16,6 +16,7 @@ export interface SastConfig {
     presetId?: number;
     scanTimeoutInMinutes?: number;
     enablePolicyViolations: boolean;
+    generatePDFReport: boolean;
     vulnerabilityThreshold: boolean;
     failBuildForNewVulnerabilitiesEnabled: boolean;
     failBuildForNewVulnerabilitiesSeverity: string;

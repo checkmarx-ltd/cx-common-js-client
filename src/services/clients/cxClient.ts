@@ -75,6 +75,10 @@ export class CxClient {
             } else {
                 this.log.info('Running in Asynchronous mode. Not waiting for scan to finish.');
             }
+            //add report generation function here.
+            if(this.config.sastConfig.generatePDFReport){
+                await this.generatePDFReport(result);
+            }
         }
 
         if (config.enableDependencyScan) {
@@ -96,7 +100,28 @@ export class CxClient {
 
         return result;
     }
-
+    
+    private async generatePDFReport(scanResult: ScanResults){
+        this.log.info("Generating PDF Report");
+        const client = new ReportingClient(this.httpClient, this.log, "PDF");
+        let reportPDF;
+        for (let i = 1; i < 25; i++) {
+            try {
+                reportPDF = await client.generateReport(scanResult.scanId, this.config.cxOrigin);
+                if (typeof reportPDF !== 'undefined' && reportPDF !== null) {
+                    this.log.info("PDF report fetched successfully");
+                    scanResult.generatePDFReport = true;
+                    scanResult.reportPDF = reportPDF;
+                    break;
+                }
+                await this.delay(15555);
+            }
+            catch (e) {
+                this.log.warning('Failed to generate report on attempt number: ' + i);
+                await this.delay(15555);
+            }
+        }
+    }
     private async initClients(httpClient?: HttpClient) {
         const baseUrl = url.resolve(this.sastConfig.serverUrl, 'CxRestAPI/');
 
@@ -457,10 +482,10 @@ Scan results location:  ${result.sastScanResultsLink}
 
     private static toJsonQueries(scanResult: ScanResults, queries: any[]) {
         var results, severity;
-        for(var query of queries) 
+        for(let query of queries) 
         {
             results = query.Result;
-            for(var result of results) {
+            for(let result of results) {
                 if(result.$.FalsePositive === "False" && result.$.Status === "New"){
                     severity = result.$.Severity;
                     switch(severity){
