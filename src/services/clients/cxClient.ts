@@ -286,28 +286,30 @@ export class CxClient {
     private async scanWithSetting(): Promise<ScanWithSettingsResponse> {
         const tempFilename = await this.zipContent();
         this.log.info(`Uploading the zipped source code.`);
+        let isOverrideProjectSettings = false;
         var apiVersionHeader = {};
         let versionInfo = await this.getVersionInfo();
         let version = versionInfo.version;
         if(version.includes('9.4')){
             apiVersionHeader = {'Content-type' : 'application/json;v=1.2'};
         }
-            const scanResponse: ScanWithSettingsResponse = await this.httpClient.postMultipartRequest('sast/scanWithSettings',
-            {
-                projectId: this.projectId,
-                overrideProjectSetting: this.isNewProject,
-                isIncremental: this.sastConfig.isIncremental,
-                isPublic: this.sastConfig.isPublic,
-                forceScan: this.sastConfig.forceScan,
-                presetId: this.presetId,
-                comment: this.sastConfig.comment,
-                customFields: this.sastConfig.customFields,
-                engineConfigurationId:this.engineConfigurationId,
-                postScanActionId:this.postScanActionId
-            },
-            { zippedSource: tempFilename },apiVersionHeader);
-            await this.deleteZip(tempFilename);
-            return scanResponse;
+        isOverrideProjectSettings = this.sastConfig.overrideProjectSettings || this.isNewProject;
+        const scanResponse: ScanWithSettingsResponse = await this.httpClient.postMultipartRequest('sast/scanWithSettings',
+        {
+            projectId: this.projectId,
+            overrideProjectSetting: isOverrideProjectSettings,
+            isIncremental: this.sastConfig.isIncremental,
+            isPublic: this.sastConfig.isPublic,
+            forceScan: this.sastConfig.forceScan,
+            presetId: this.presetId,
+            comment: this.sastConfig.comment,
+            customFields: this.sastConfig.customFields,
+            engineConfigurationId:this.engineConfigurationId,
+            postScanActionId:this.postScanActionId
+        },
+        { zippedSource: tempFilename },apiVersionHeader);
+        await this.deleteZip(tempFilename);
+        return scanResponse;
     }
 
     private async uploadSourceCode(): Promise<void> {
