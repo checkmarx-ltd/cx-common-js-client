@@ -52,6 +52,9 @@ export class ScanResults {
     sastScanResultsLink = '';
     sastSummaryResultsLink = '';
 
+    generatePDFReport = false ;
+    reportPDF = [];
+
     scanStart = '';    // E.g. "Sunday, October 27, 2019 1:58:48 PM"
     scanTime = '';     // E.g. "00h:03m:25s"
 

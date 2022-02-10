@@ -75,6 +75,10 @@ export class CxClient {
             } else {
                 this.log.info('Running in Asynchronous mode. Not waiting for scan to finish.');
             }
+            //add report generation function here.
+            if(this.config.sastConfig.generatePDFReport){
+                await this.generatePDFReport(result);
+            }
         }
 
         if (config.enableDependencyScan) {
@@ -96,7 +100,28 @@ export class CxClient {
 
         return result;
     }
-
+    
+    private async generatePDFReport(scanResult: ScanResults){
+        this.log.info("Generating PDF Report");
+        const client = new ReportingClient(this.httpClient, this.log, "PDF");
+        let reportPDF;
+        for (let i = 1; i < 25; i++) {
+            try {
+                reportPDF = await client.generateReport(scanResult.scanId, this.config.cxOrigin);
+                if (typeof reportPDF !== 'undefined' && reportPDF !== null) {
+                    this.log.info("PDF report fetched successfully");
+                    scanResult.generatePDFReport = true;
+                    scanResult.reportPDF = reportPDF;
+                    break;
+                }
+                await this.delay(15555);
+            }
+            catch (e) {
+                this.log.warning('Failed to generate report on attempt number: ' + i);
+                await this.delay(15555);
+            }
+        }
+    }
     private async initClients(httpClient?: HttpClient) {
         const baseUrl = url.resolve(this.sastConfig.serverUrl, 'CxRestAPI/');
 
@@ -261,28 +286,30 @@ export class CxClient {
     private async scanWithSetting(): Promise<ScanWithSettingsResponse> {
         const tempFilename = await this.zipContent();
         this.log.info(`Uploading the zipped source code.`);
+        let isOverrideProjectSettings = false;
         var apiVersionHeader = {};
         let versionInfo = await this.getVersionInfo();
         let version = versionInfo.version;
         if(version.includes('9.4')){
             apiVersionHeader = {'Content-type' : 'application/json;v=1.2'};
         }
-            const scanResponse: ScanWithSettingsResponse = await this.httpClient.postMultipartRequest('sast/scanWithSettings',
-            {
-                projectId: this.projectId,
-                overrideProjectSetting: this.isNewProject,
-                isIncremental: this.sastConfig.isIncremental,
-                isPublic: this.sastConfig.isPublic,
-                forceScan: this.sastConfig.forceScan,
-                presetId: this.presetId,
-                comment: this.sastConfig.comment,
-                customFields: this.sastConfig.customFields,
-                engineConfigurationId:this.engineConfigurationId,
-                postScanActionId:this.postScanActionId
-            },
-            { zippedSource: tempFilename },apiVersionHeader);
-            await this.deleteZip(tempFilename);
-            return scanResponse;
+        isOverrideProjectSettings = this.sastConfig.overrideProjectSettings || this.isNewProject;
+        const scanResponse: ScanWithSettingsResponse = await this.httpClient.postMultipartRequest('sast/scanWithSettings',
+        {
+            projectId: this.projectId,
+            overrideProjectSetting: isOverrideProjectSettings,
+            isIncremental: this.sastConfig.isIncremental,
+            isPublic: this.sastConfig.isPublic,
+            forceScan: this.sastConfig.forceScan,
+            presetId: this.presetId,
+            comment: this.sastConfig.comment,
+            customFields: this.sastConfig.customFields,
+            engineConfigurationId:this.engineConfigurationId,
+            postScanActionId:this.postScanActionId
+        },
+        { zippedSource: tempFilename },apiVersionHeader);
+        await this.deleteZip(tempFilename);
+        return scanResponse;
     }
 
     private async uploadSourceCode(): Promise<void> {
@@ -455,10 +482,10 @@ Scan results location:  ${result.sastScanResultsLink}
 
     private static toJsonQueries(scanResult: ScanResults, queries: any[]) {
         var results, severity;
-        for(var query of queries) 
+        for(let query of queries) 
         {
             results = query.Result;
-            for(var result of results) {
+            for(let result of results) {
                 if(result.$.FalsePositive === "False" && result.$.Status === "New"){
                     severity = result.$.Severity;
                     switch(severity){
