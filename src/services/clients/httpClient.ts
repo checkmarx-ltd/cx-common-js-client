@@ -102,7 +102,7 @@ export class HttpClient {
                     if(this.proxyContent){
 
                     let FindProxyForURL = pac(this.proxyContent);                    
-                    const urlComponents = url.parse(this.baseUrl);                    
+                    const urlComponents =  new URL(this.baseUrl); //url.parse(this.baseUrl);                    
                     var hostName = urlComponents.hostname;
                     this.log.info("Resolving proxy for URL: "+ this.baseUrl + " and Hostname: "+ hostName);                     
                     await FindProxyForURL(this.baseUrl,hostName).then((res) => {
