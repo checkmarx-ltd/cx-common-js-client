@@ -44,9 +44,16 @@ export class ScanResults {
     mediumResults = 0;
     lowResults = 0;
     infoResults = 0;
+    newHighCount = 0;
+    newMediumCount = 0;
+    newLowCount = 0;
+    newInfoCount = 0;
 
     sastScanResultsLink = '';
     sastSummaryResultsLink = '';
+
+    generatePDFReport = false ;
+    reportPDF = [];
 
     scanStart = '';    // E.g. "Sunday, October 27, 2019 1:58:48 PM"
     scanTime = '';     // E.g. "00h:03m:25s"

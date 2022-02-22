@@ -8,6 +8,7 @@ export interface SastConfig {
     denyProject: boolean;
     folderExclusion: string;
     fileExtension: string;
+    overrideProjectSettings: boolean;
     isIncremental: boolean;
     forceScan: boolean;
     comment: string;
@@ -15,11 +16,15 @@ export interface SastConfig {
     presetId?: number;
     scanTimeoutInMinutes?: number;
     enablePolicyViolations: boolean;
+    generatePDFReport: boolean;
     vulnerabilityThreshold: boolean;
+    failBuildForNewVulnerabilitiesEnabled: boolean;
+    failBuildForNewVulnerabilitiesSeverity: string;
     highThreshold?: number;
     mediumThreshold?: number;
     lowThreshold?: number;
     cacert_chainFilePath: string;
+    projectCustomFields: string;
     customFields: string;
     engineConfigurationId?: number;
     postScanActionName: string;
