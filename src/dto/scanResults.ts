@@ -44,6 +44,8 @@ export class ScanResults {
     mediumResults = 0;
     lowResults = 0;
     infoResults = 0;
+
+    failBuildForNewVulnerabilitiesEnabled: boolean = false;
     newHighCount = 0;
     newMediumCount = 0;
     newLowCount = 0;
@@ -89,6 +91,7 @@ export class ScanResults {
         this.highThreshold = sastConfig.highThreshold;
         this.mediumThreshold = sastConfig.mediumThreshold;
         this.lowThreshold = sastConfig.lowThreshold;
+        this.failBuildForNewVulnerabilitiesEnabled = sastConfig.failBuildForNewVulnerabilitiesEnabled;
     }
 
     constructor() {

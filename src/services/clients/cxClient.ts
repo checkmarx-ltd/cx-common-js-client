@@ -264,7 +264,7 @@ export class CxClient {
 
         await this.addDetailedReportToScanResults(result); //setting newSeverities
 
-        this.printStatistics(result); //this line of code needs to be moved below addDetailedReportToScanResults
+        this.printStatistics(result);
 
         const evaluator = new SastSummaryEvaluator(this.sastConfig, this.isPolicyEnforcementSupported);
         const summary = evaluator.getScanSummary(result);
@@ -482,10 +482,10 @@ export class CxClient {
     }
 
     private printStatistics(result: ScanResults) {
-        const newHigh = result.newHighCount > 0 ? " (" + result.newHighCount + " new)" : "";
-        const newMedium = result.newMediumCount > 0 ? " (" + result.newMediumCount + " new)" : "";
-        const newLow = result.newLowCount > 0 ? " (" + result.newLowCount + " new)" : "";
-        const newInfo = result.newInfoCount > 0 ? " (" + result.newInfoCount + " new)" : "";
+        const newHigh = (result.newHighCount > 0  && result.failBuildForNewVulnerabilitiesEnabled) ? " (" + result.newHighCount + " new)" : "";
+        const newMedium = (result.newMediumCount > 0 && result.failBuildForNewVulnerabilitiesEnabled) ? " (" + result.newMediumCount + " new)" : "";
+        const newLow = (result.newLowCount > 0 && result.failBuildForNewVulnerabilitiesEnabled) ? " (" + result.newLowCount + " new)" : "";
+        const newInfo = (result.newInfoCount > 0 && result.failBuildForNewVulnerabilitiesEnabled) ? " (" + result.newInfoCount + " new)" : "";
         this.log.info(`----------------------------Checkmarx Scan Results(CxSAST):-------------------------------
 High severity results: ${result.highResults}${newHigh}
 Medium severity results: ${result.mediumResults}${newMedium}
