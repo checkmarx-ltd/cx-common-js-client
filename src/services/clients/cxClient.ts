@@ -124,7 +124,7 @@ export class CxClient {
     }
     private async initClients(httpClient?: HttpClient) {
         const baseUrl = url.resolve(this.sastConfig.serverUrl, 'CxRestAPI/');
-        let sastProxyConfig = this.config.proxyConfig;
+        let sastProxyConfig = JSON.parse(JSON.stringify(this.config.proxyConfig));
 
         if (!httpClient) 
         {
@@ -156,23 +156,24 @@ export class CxClient {
 
     private async initScaClient() {
         let scaHttpClient: HttpClient;
-        let scaProxyConfig = this.config.proxyConfig;
+        let scaProxyConfig = JSON.parse(JSON.stringify(this.config.proxyConfig));
 
         if (this.config.enableProxy && this.config.proxyConfig && (this.proxyConfig.proxyHost != '' || this.proxyConfig.proxyUrl != '' || this.proxyConfig.scaProxyUrl != '')) 
         {
             scaProxyConfig.proxyUrl = this.proxyConfig.scaProxyUrl != '' ? this.proxyConfig.scaProxyUrl : this.proxyConfig.proxyUrl;
             scaProxyConfig.sastProxyUrl = '';
             scaProxyConfig.scaProxyUrl = '';
-            scaHttpClient = new HttpClient(this.scaConfig.apiUrl, this.config.cxOrigin, this.config.cxOriginUrl,this.log, this.proxyConfig, this.scaConfig.cacert_chainFilePath);
+            this.log.info("Overriten URL "+this.config.proxyConfig.sastProxyUrl);
+            scaHttpClient = new HttpClient(this.scaConfig.apiUrl, this.config.cxOrigin, this.config.cxOriginUrl,this.log, scaProxyConfig, this.scaConfig.cacert_chainFilePath);
         } 
         else 
         {
             scaHttpClient = new HttpClient(this.scaConfig.apiUrl, this.config.cxOrigin, this.config.cxOriginUrl,this.log, undefined, this.scaConfig.cacert_chainFilePath);
         }
-
-        this.scaClient = new ScaClient(this.scaConfig, this.config.sourceLocation, scaHttpClient, this.log, this.config);
+        await scaHttpClient.getPacProxyResolve();
+        this.scaClient = new ScaClient(this.scaConfig, this.config.sourceLocation, scaHttpClient, this.log,scaProxyConfig, this.config);
         
-        await this.scaClient.httpClient.getPacProxyResolve();
+       
         await this.scaClient.scaLogin(this.scaConfig);
         await this.scaClient.resolveProject(this.config.projectName);
     }
@@ -264,7 +265,7 @@ export class CxClient {
 
         await this.addDetailedReportToScanResults(result); //setting newSeverities
 
-        this.printStatistics(result); //this line of code needs to be moved below addDetailedReportToScanResults
+        this.printStatistics(result);
 
         const evaluator = new SastSummaryEvaluator(this.sastConfig, this.isPolicyEnforcementSupported);
         const summary = evaluator.getScanSummary(result);
@@ -482,10 +483,10 @@ export class CxClient {
     }
 
     private printStatistics(result: ScanResults) {
-        const newHigh = result.newHighCount > 0 ? " (" + result.newHighCount + " new)" : "";
-        const newMedium = result.newMediumCount > 0 ? " (" + result.newMediumCount + " new)" : "";
-        const newLow = result.newLowCount > 0 ? " (" + result.newLowCount + " new)" : "";
-        const newInfo = result.newInfoCount > 0 ? " (" + result.newInfoCount + " new)" : "";
+        const newHigh = (result.newHighCount > 0  && result.failBuildForNewVulnerabilitiesEnabled) ? " (" + result.newHighCount + " new)" : "";
+        const newMedium = (result.newMediumCount > 0 && result.failBuildForNewVulnerabilitiesEnabled) ? " (" + result.newMediumCount + " new)" : "";
+        const newLow = (result.newLowCount > 0 && result.failBuildForNewVulnerabilitiesEnabled) ? " (" + result.newLowCount + " new)" : "";
+        const newInfo = (result.newInfoCount > 0 && result.failBuildForNewVulnerabilitiesEnabled) ? " (" + result.newInfoCount + " new)" : "";
         this.log.info(`----------------------------Checkmarx Scan Results(CxSAST):-------------------------------
 High severity results: ${result.highResults}${newHigh}
 Medium severity results: ${result.mediumResults}${newMedium}
