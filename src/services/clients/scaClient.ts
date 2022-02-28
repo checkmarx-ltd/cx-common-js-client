@@ -1,4 +1,4 @@
-import { Logger, PollingSettings, SastConfig, ScaConfig, ScanConfig, Waiter } from "../..";
+import { Logger, PollingSettings, ProxyConfig, SastConfig, ScaConfig, ScanConfig, Waiter } from "../..";
 import { HttpClient } from "./httpClient";
 import { Stopwatch } from "../stopwatch";
 import { ScaLoginSettings } from "../../dto/sca/scaLoginSettings";
@@ -37,6 +37,7 @@ import { PolicyRule } from "../../dto/api/PolicyRule";
 import { config } from "process";
 import { SastClient } from "./sastClient";
 import { SpawnScaResolver } from "./SpawnScaResolver";
+import { ProxyHelper } from "../proxyHelper";
 const fs = require('fs');
 ;/**
  * SCA - Software Composition Analysis - is the successor of OSA.
@@ -77,6 +78,7 @@ export class ScaClient {
         private readonly sourceLocation: string,
         private readonly httpClient: HttpClient,
         private readonly log: Logger,
+        private readonly proxyConfig:ProxyConfig,
         private readonly scanConfig: ScanConfig) {
     }
 
@@ -399,12 +401,10 @@ export class ScaClient {
         this.log.debug(`Sending PUT request to ${uploadUrl}`);
         const child_process = require('child_process');
         let command;
-        if (this.scanConfig.enableProxy && this.scanConfig.proxyConfig && this.scanConfig.proxyConfig.proxyHost != '') {
-            if (this.scanConfig.proxyConfig.proxyUser && this.scanConfig.proxyConfig.proxyPass) {
-                command = `curl -U ${this.scanConfig.proxyConfig.proxyUser}:${this.scanConfig.proxyConfig.proxyPass} -x ${this.scanConfig.proxyConfig.proxyHost} -X PUT -L "${uploadUrl}" -H "Content-Type:" -T "${file}"`;
-            } else {
-                command = `curl -x ${this.scanConfig.proxyConfig.proxyHost} -X PUT -L "${uploadUrl}" -H "Content-Type:" -T "${file}"`;
-            }
+        if ( this.scanConfig.enableProxy && this.proxyConfig) {
+            let proxyUrl=ProxyHelper.getFormattedProxy(this.proxyConfig);
+            command = `curl -x ${proxyUrl} -X PUT -L "${uploadUrl}" -H "Content-Type:" -T "${file}"`;
+
         } else {
             command = `curl -X PUT -L "${uploadUrl}" -H "Content-Type:" -T "${file}"`;
         }
