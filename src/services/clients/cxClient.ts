@@ -503,31 +503,7 @@ Scan results location:  ${result.sastScanResultsLink}
     }
 
     private static toJsonQueries(scanResult: ScanResults, queries: any[]) {
-        var results, severity;
-        for(let query of queries) 
-        {
-            results = query.Result;
-            for(let result of results) {
-                if(result.$.FalsePositive === "False" && result.$.Status === "New"){
-                    severity = result.$.Severity;
-                    switch(severity){
-                        case "High":
-                            scanResult.newHighCount++;
-                            break;
-                        case "Medium":
-                            scanResult.newMediumCount++;
-                            break;
-                        case "Low":
-                            scanResult.newLowCount++;
-                            break;
-                        case "Information":
-                            scanResult.newInfoCount++;
-                            break;
-                    }
-                }
-            }
-        }
-        const SEPARATOR = ';';
+           const SEPARATOR = ';';
 
         // queries can be undefined if no vulnerabilities were found.
         return (queries || []).map(query =>
