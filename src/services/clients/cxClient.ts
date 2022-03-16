@@ -473,6 +473,10 @@ export class CxClient {
         result.filesScanned = doc.$.FilesScanned;
         result.queryList = CxClient.toJsonQueries(result, doc.Query);
 
+        //Find if there are any new vulnerabilities
+        if(this.sastConfig.failBuildForNewVulnerabilitiesEnabled)
+            CxClient.getNewVulnerabilityCounts(result, doc.Query);
+        
         // TODO: PowerShell code also adds properties such as newHighCount, but they are not used in the UI.
     }
 
@@ -499,7 +503,23 @@ Scan results location:  ${result.sastScanResultsLink}
     }
 
     private static toJsonQueries(scanResult: ScanResults, queries: any[]) {
+           const SEPARATOR = ';';
+
+        // queries can be undefined if no vulnerabilities were found.
+        return (queries || []).map(query =>
+            JSON.stringify({
+                name: query.$.name,
+                severity: query.$.Severity,
+                resultLength: query.Result.length
+            })
+        ).join(SEPARATOR);
+    }
+
+    private static getNewVulnerabilityCounts(scanResult: ScanResults, queries: any[]) {
         var results, severity;
+        if(queries == undefined || queries.length == 0)
+            return;
+
         for(let query of queries) 
         {
             results = query.Result;
@@ -523,16 +543,6 @@ Scan results location:  ${result.sastScanResultsLink}
                 }
             }
         }
-        const SEPARATOR = ';';
-
-        // queries can be undefined if no vulnerabilities were found.
-        return (queries || []).map(query =>
-            JSON.stringify({
-                name: query.$.name,
-                severity: query.$.Severity,
-                resultLength: query.Result.length
-            })
-        ).join(SEPARATOR);
     }
 
     private async getVersionInfo() {
