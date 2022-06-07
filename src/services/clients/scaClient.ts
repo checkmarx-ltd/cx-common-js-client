@@ -401,11 +401,24 @@ export class ScaClient {
         this.log.debug(`Sending PUT request to ${uploadUrl}`);
         const child_process = require('child_process');
         let command;
+
+        if (this.scanConfig.enableProxy) {
+            this.log.info(`scanConfig.enableProxy is TRUE`);
+        }
+        if (this.proxyConfig){
+            this.log.info(`proxyConfig is TRUE`);
+            this.log.info(`SCA proxy URL: ` + this.proxyConfig.scaProxyUrl);
+        }
+        if (this.proxyConfig.scaProxyUrl){
+            this.log.info(`proxyConfig.scaProxyUrl is TRUE`);
+        }
+
         if ( this.scanConfig.enableProxy && this.proxyConfig && this.proxyConfig.scaProxyUrl) {
             let proxyUrl=ProxyHelper.getFormattedProxy(this.proxyConfig);
-            command = `curl -x ${proxyUrl} -X PUT -L "${uploadUrl}" -H "Content-Type:" -T "${file}"`;
+            command = `curl -x ${proxyUrl} -X PUT -L "${uploadUrl}" -H "Content-Type:" -T "${file}" --ssl-no-revoke`;
         } else {
-            command = `curl -X PUT -L "${uploadUrl}" -H "Content-Type:" -T "${file}"`;
+            this.log.info(`No proxy being used to AWS upload`);
+            command = `curl -X PUT -L "${uploadUrl}" -H "Content-Type:" -T "${file}" --ssl-no-revoke`;
         }
         child_process.execSync(command, { stdio: 'pipe' });
     }
