@@ -565,7 +565,12 @@ Scan results location:  ${result.sastScanResultsLink}
             this.presetId = this.sastConfig.presetId;
         }
         else {
+            if(this.sastConfig.presetName=='Project Default'){
+                this.presetId = 0;
+            }
+            else{
             this.presetId = await this.sastClient.getPresetIdByName(this.sastConfig.presetName);
+            }
         }
 
         if (this.sastConfig.teamId) {
