@@ -401,8 +401,9 @@ export class ScaClient {
         this.log.debug(`Sending PUT request to ${uploadUrl}`);
         const child_process = require('child_process');
         let command;
-        if ( this.scanConfig.enableProxy && this.proxyConfig && this.proxyConfig.scaProxyUrl) {
-            let proxyUrl=ProxyHelper.getFormattedProxy(this.proxyConfig);
+        //proxyConfig is instance of scaProxyConfig so proxyUrl set to proxyConfig proxy url 
+        if ( this.scanConfig.enableProxy && this.proxyConfig && this.proxyConfig.proxyUrl) {
+            let proxyUrl = this.proxyConfig.proxyUrl;
             command = `curl -x ${proxyUrl} -X PUT -L "${uploadUrl}" -H "Content-Type:" -T "${file}"`;
         } else {
             command = `curl -X PUT -L "${uploadUrl}" -H "Content-Type:" -T "${file}"`;
