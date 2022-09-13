@@ -1,37 +1,29 @@
 import * as path from "path";
 import {spawn } from "child_process";
-
+import { Logger } from '../logger';
 
 export class SpawnScaResolver {
     
     private static readonly SCA_RESOLVER_EXE= "ScaResolver";
-    private static readonly OFFLINE = "offline";
-
+    private static readonly OFFLINE = "offline";    
+    
     /**
 	 * This method executes
 	 * @param pathToScaResolver - Path to SCA Resolver executable
 	 * @param scaResolverAddParams - Additional parameters for SCA resolver
 	 * @return
 	 */
-     static async runScaResolver(pathToScaResolver:string, scaResolverAddParams: string,pathToResultJSONFile:string ):Promise<number> {
+     static async runScaResolver(pathToScaResolver:string, scaResolverAddParams: string,pathToResultJSONFile:string, log: Logger):Promise<number> {
       let exitCode:number = -100;
       let scaResolverCommand: string;
-      let argument: Array<string>;
+      let argument: Array<string>;  
 
       //   Convert path and additional parameters into a single CMD command
       argument = scaResolverAddParams.split(" ");
       scaResolverCommand = pathToScaResolver + path.sep + SpawnScaResolver.SCA_RESOLVER_EXE;
       scaResolverCommand = scaResolverCommand + " " + SpawnScaResolver.OFFLINE;
       for(let i=0; i<argument.length;i++){
-        let arg: string  = argument[i];
-        if(arg=="debug")
-        {
-            arg = "Debug";
-        }
-        if(arg=="error")
-        {
-            arg = "Error";
-        }
+        let arg: string  = argument[i];        
         scaResolverCommand = scaResolverCommand + " " + arg;
         if(arg=="-r")
         {
@@ -43,21 +35,43 @@ export class SpawnScaResolver {
       }
 
 
-    try{
+    try{                         
+        log.debug(`SCA Resolver Command : ${scaResolverCommand}`);
+        let errorOccured = '';
         const child = spawn(scaResolverCommand, [''], {shell: true});
         exitCode = await new Promise( (resolve, reject) => {
-            child.on('close', resolve);
-        });
-    
-        if( exitCode) {
-            throw new Error( `subprocess error exit ${exitCode}`);
-        }
+            child.stdout.on("data", (x: any) => {
+                log.debug('Result data on executing command :' + x.toString().replace(/(\r\n|\n|\r)/gm, ""));                
+              });
+            
+            child.stderr.on("data", (x: any) => {                                       
+                errorOccured = x.toString();
+                errorOccured = errorOccured.replace(/(\r\n|\n|\r)/gm, "");
+                log.debug('Error on executing command :' + x.toString().replace(/(\r\n|\n|\r)/gm, ""));                        
+              });
+
+              child.on('error', (err: any) => { 
+                log.debug(`Error on executing command:  ${err}`); 
+                throw new Error(`Error occurred while running SCA Resolver err.` + err);
+             });
+
+              child.on("exit", (code: any) => {
+                log.debug(`subprocess exit with ${code}`);               
+              }); 
+                     
+          child.on('close', resolve);                     
+          log.debug('SCA Resolver closing');
+        
+    });
+
+    if (errorOccured !='') {
+        throw  Error(`Error occurred while running SCA Resolver. ${errorOccured}`);
+    }       
         
     }catch(err){
         throw Error(`Error occurred while running SCA Resolver.`+err);
     }
     return exitCode;    
-}
-   
+}   
 
 }

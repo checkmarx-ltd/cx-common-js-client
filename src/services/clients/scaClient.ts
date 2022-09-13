@@ -38,6 +38,7 @@ import { config } from "process";
 import { SastClient } from "./sastClient";
 import { SpawnScaResolver } from "./SpawnScaResolver";
 import { ProxyHelper } from "../proxyHelper";
+import { spawn } from "child_process";
 const fs = require('fs');
 ;/**
  * SCA - Software Composition Analysis - is the successor of OSA.
@@ -73,7 +74,7 @@ export class ScaClient {
     private static readonly pollingSettings: PollingSettings = {
         intervalSeconds: 10,
         masterTimeoutMinutes: 20
-    };
+    }; 
     constructor(private readonly config: ScaConfig,
         private readonly sourceLocation: string,
         private readonly httpClient: HttpClient,
@@ -278,12 +279,13 @@ export class ScaClient {
      */
 
      private async submitScaResolverEvidenceFile() : Promise<any>{
-    	this.log.info("Sca Resolver Additional Parameters: " + this.config.scaResolverAddParameters);
+        this.log.info("SCA Resolver launching.");
+    	this.log.info("SCA Resolver Additional Parameters: " + this.config.scaResolverAddParameters);
         let pathToResultJSONFile:string;
         pathToResultJSONFile = this.getScaResolverResultFilePathFromAdditionalParams(this.config.scaResolverAddParameters);
         this.log.info("Path to the evidence file" + pathToResultJSONFile);
-        let exitCode;
-        await SpawnScaResolver.runScaResolver(this.config.pathToScaResolver, this.config.scaResolverAddParameters,pathToResultJSONFile).then(res => {
+        let exitCode;         
+        await SpawnScaResolver.runScaResolver(this.config.pathToScaResolver, this.config.scaResolverAddParameters,pathToResultJSONFile,this.log).then(res => {
             exitCode = res;
           })
           let zipFile:string='';
