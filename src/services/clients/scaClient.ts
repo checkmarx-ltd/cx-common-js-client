@@ -320,7 +320,7 @@ export class ScaClient {
         let pathToEvidenceDir :string = ""; 
         argument = scaResolverAddParams.split(" ");
         for (let i = 0; i <  argument.length ; i++) {
-            if (argument[i] == ("-r") ){
+            if (argument[i] == ("-r") || argument[i] == ("--resolver-result-path")){
                 pathToEvidenceDir =  argument[i+1];
                 break;
             }

@@ -25,7 +25,7 @@ export class SpawnScaResolver {
       for(let i=0; i<argument.length;i++){
         let arg: string  = argument[i];        
         scaResolverCommand = scaResolverCommand + " " + arg;
-        if(arg=="-r")
+        if(arg=="-r" || arg == "--resolver-result-path")
         {
             scaResolverCommand =scaResolverCommand + " " +pathToResultJSONFile;
             i=i+1;
@@ -41,13 +41,19 @@ export class SpawnScaResolver {
         const child = spawn(scaResolverCommand, [''], {shell: true});
         exitCode = await new Promise( (resolve, reject) => {
             child.stdout.on("data", (x: any) => {
-                log.debug('Result data on executing command :' + x.toString().replace(/(\r\n|\n|\r)/gm, ""));                
+              var data = x.toString();
+              data = data.replace(/(\r\n|\n|\r)/gm, "");
+              if(data !='' || data !=' ' ) {
+                log.debug(data);   
+              }             
               });
             
             child.stderr.on("data", (x: any) => {                                       
-                errorOccured = x.toString();
-                errorOccured = errorOccured.replace(/(\r\n|\n|\r)/gm, "");
-                log.debug('Error on executing command :' + x.toString().replace(/(\r\n|\n|\r)/gm, ""));                        
+                errorOccured = x.toString();  
+                errorOccured = errorOccured.replace(/(\r\n|\n|\r)/gm, "");              
+                if(errorOccured !='')  {
+                log.debug('Error on executing command :' + errorOccured); 
+                }                       
               });
 
               child.on('error', (err: any) => { 
@@ -56,12 +62,11 @@ export class SpawnScaResolver {
              });
 
               child.on("exit", (code: any) => {
-                log.debug(`subprocess exit with ${code}`);               
+                log.debug(`subprocess exit with ${code}`); 
+                log.debug('SCA Resolver closing');              
               }); 
-                     
-          child.on('close', resolve);                     
-          log.debug('SCA Resolver closing');
-        
+
+          child.on('close', resolve);          
     });
 
     if (errorOccured !='') {
