@@ -278,19 +278,17 @@ export class ScaClient {
      * @throws IOException
      */
 
-     private async submitScaResolverEvidenceFile() : Promise<any>{
-        this.log.info("SCA Resolver launching.");
-    	this.log.info("SCA Resolver Additional Parameters: " + this.config.scaResolverAddParameters);
+     private async submitScaResolverEvidenceFile() : Promise<any>{        
         let pathToResultJSONFile:string;
         pathToResultJSONFile = this.getScaResolverResultFilePathFromAdditionalParams(this.config.scaResolverAddParameters);
-        this.log.info("Path to the evidence file" + pathToResultJSONFile);
+        this.log.info("Path to the evidence file: " + pathToResultJSONFile);
         let exitCode;         
         await SpawnScaResolver.runScaResolver(this.config.pathToScaResolver, this.config.scaResolverAddParameters,pathToResultJSONFile,this.log).then(res => {
             exitCode = res;
           })
           let zipFile:string='';
         if (exitCode == 0) {
-            this.log.info("SCA resolution completed successfully.");  
+            this.log.info("Dependencies resolution completed.");  
             let resultFilePath :string = pathToResultJSONFile;
             await this.zipEvidenceFile(resultFilePath).then(res => {
                 zipFile = res;

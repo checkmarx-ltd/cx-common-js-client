@@ -35,10 +35,10 @@ export class SpawnScaResolver {
       }
 
 
-    try{                         
-        log.debug(`SCA Resolver Command : ${scaResolverCommand}`);
+    try{
         let errorOccured = '';
         const child = spawn(scaResolverCommand, [''], {shell: true});
+        log.debug("SCA Resolver command running.");
         exitCode = await new Promise( (resolve, reject) => {
             child.stdout.on("data", (x: any) => {
               var data = x.toString();
@@ -52,18 +52,18 @@ export class SpawnScaResolver {
                 errorOccured = x.toString();  
                 errorOccured = errorOccured.replace(/(\r\n|\n|\r)/gm, "");              
                 if(errorOccured !='')  {
-                log.debug('Error on executing command :' + errorOccured); 
+                log.debug('Error occurred while running SCA Resolver:' + errorOccured); 
                 }                       
               });
 
               child.on('error', (err: any) => { 
-                log.debug(`Error on executing command:  ${err}`); 
-                throw new Error(`Error occurred while running SCA Resolver err.` + err);
+                log.debug(`Error occurred while running SCA Resolver:  ${err}`); 
+                throw new Error(`Error occurred while running SCA Resolver.` + err);
              });
 
               child.on("exit", (code: any) => {
-                log.debug(`subprocess exit with ${code}`); 
-                log.debug('SCA Resolver closing');              
+                log.debug(`Subprocess exit with ${code}.`); 
+                log.debug('SCA Resolver closing.');              
               }); 
 
           child.on('close', resolve);          
