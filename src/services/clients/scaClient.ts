@@ -39,6 +39,7 @@ import { SastClient } from "./sastClient";
 import { SpawnScaResolver } from "./SpawnScaResolver";
 import { ProxyHelper } from "../proxyHelper";
 import { spawn } from "child_process";
+import { any } from "micromatch";
 const fs = require('fs');
 ;/**
  * SCA - Software Composition Analysis - is the successor of OSA.
@@ -75,6 +76,9 @@ export class ScaClient {
         intervalSeconds: 10,
         masterTimeoutMinutes: 20
     }; 
+    private readonly SAST_RESOLVER_RESULT_FILE_NAME: string =".cxsca-sast-results.json";
+     resultToZip: File[] = [];
+
     constructor(private readonly config: ScaConfig,
         private readonly sourceLocation: string,
         private readonly httpClient: HttpClient,
@@ -280,6 +284,8 @@ export class ScaClient {
 
      private async submitScaResolverEvidenceFile() : Promise<any>{        
         let pathToResultJSONFile:string;
+        let pathToSASRResultJSONFile:string;
+        let resultToZip = [] ;
         pathToResultJSONFile = this.getScaResolverResultFilePathFromAdditionalParams(this.config.scaResolverAddParameters);
         this.log.info("Path to the evidence file: " + pathToResultJSONFile);
         let exitCode;         
@@ -290,7 +296,14 @@ export class ScaClient {
         if (exitCode == 0) {
             this.log.info("Dependencies resolution completed.");  
             let resultFilePath :string = pathToResultJSONFile;
-            await this.zipEvidenceFile(resultFilePath).then(res => {
+            resultToZip.push(pathToResultJSONFile);                
+                //check for exploitable path
+                if(this.config.scaResolverAddParameters.indexOf("--sast-result-path") !== -1)
+                {                
+                pathToSASRResultJSONFile = this.getScaResolverSASTResultFilePathFromAdditionalParams(this.config.scaResolverAddParameters);
+                resultToZip.push(pathToSASRResultJSONFile);
+            }
+            await this.zipEvidenceFile(resultToZip).then(res => {
                 zipFile = res;
               })
         }else{
@@ -302,14 +315,16 @@ export class ScaClient {
         await this.deleteZip(zipFile);
         return this.sendStartScanRequest(SourceLocationType.LOCAL_DIRECTORY, uploadedArchiveUrl);
     }
-   async zipEvidenceFile(resultFilePath:string):Promise<string>{
+   async zipEvidenceFile(resultFilePath:string[]):Promise<string>{
         const tempFilename = tmpNameSync({ prefix: ScaClient.TEMP_FILE_NAME_TO_SCA_RESOLVER_RESULTS_ZIP, postfix: '.zip' });
         this.log.debug(`Zipping source code at ${resultFilePath} into file ${tempFilename}`);
         const zipper = new Zipper(this.log);
-        const zipResult = await zipper.zipDirectory(resultFilePath, tempFilename);
+        for(let i=0; i<resultFilePath.length;i++) {
+        const zipResult = await zipper.zipDirectory(resultFilePath[i], tempFilename);
         if (zipResult.fileCount === 0) {
             throw new TaskSkippedError('Zip file is empty: no source to scan');
         }
+    }
         return tempFilename;
     }
 
@@ -652,4 +667,65 @@ The Build Failed for the Following Reasons:
             result.scaResults = scaReportResults;
         }
     }
+
+    getScaResolverSASTResultFilePathFromAdditionalParams(scaResolverAddParams:string): string{
+        let argument, projectName = '';
+        let pathToEvidenceDir = "";
+        argument = scaResolverAddParams.split(" ");
+        for (let i = 0; i < argument.length; i++) {
+            if (argument[i] =='-n')
+            {
+              projectName = argument[i + 1];
+            }
+            if (argument[i] == ("--sast-result-path")) {
+             if (fs.lstatSync(argument[i + 1]).isDirectory()){
+                pathToEvidenceDir = argument[i + 1];              
+                 
+                let mostRecentFile = this.getLatestFile(argument[i + 1], projectName);             
+                pathToEvidenceDir = pathToEvidenceDir + path.sep + this.SAST_RESOLVER_RESULT_FILE_NAME;
+                fs.renameSync(argument[i + 1] + path.sep + mostRecentFile, pathToEvidenceDir); 
+            }
+            else   if(path.isAbsolute(argument[i + 1])) {                  
+                    var filename = argument[i + 1].replace(/.*[\\\/]/, '');                    
+                    pathToEvidenceDir = argument[i + 1].replace(filename, this.SAST_RESOLVER_RESULT_FILE_NAME);   
+                    fs.renameSync(argument[i + 1], pathToEvidenceDir);                
+            }
+            
+                break;
+            }
+        }
+        return pathToEvidenceDir;
+    }
+
+     
+      getLatestFile(dirpath:string, projectName:string) {
+
+        // Check if dirpath exist or not right here
+      
+        let latest:any;
+      
+        const files = fs.readdirSync(dirpath);
+        files.forEach((filename: string) => {
+          // Get the stat
+          if(filename.startsWith(projectName)){
+          const stat = fs.lstatSync(path.join(dirpath, filename));
+          // Pass if it is a directory
+          if (stat.isDirectory())
+            return;
+      
+          // latest default to first file
+          if (!latest) {
+            latest = {filename, mtime: stat.mtime};
+            return;
+          }
+          // update latest if mtime is greater than the current latest
+          if (stat.mtime > latest.mtime) {
+            latest.filename = filename;
+            latest.mtime = stat.mtime;
+          }
+        }
+        });
+      
+        return latest.filename;
+      }  
 }
