@@ -330,16 +330,29 @@ export class ScaClient {
 
     getScaResolverResultFilePathFromAdditionalParams(scaResolverAddParams: string): string {
         let argument: Array<string>;
-        let pathToEvidenceDir: string = "";
+        let resolverResultPath: string = "";
         argument = scaResolverAddParams.split(" ");
         for (let i = 0; i < argument.length; i++) {
             if (argument[i] == ("-r") || argument[i] == ("--resolver-result-path")) {
-                pathToEvidenceDir = argument[i + 1];
+                resolverResultPath = argument[i + 1];
+                let fileExists = fs.existsSync(resolverResultPath);                
+                    if(!fileExists) 
+                    {
+                        var resolverResultPathFile = fs.openSync(resolverResultPath, 'w');
+                    } 
+
+                if (fs.lstatSync(resolverResultPath).isDirectory()) {
+                    resolverResultPath = resolverResultPath + path.sep + this.getUniqueFolder() + path.sep + ScaClient.SCA_RESOLVER_RESULT_FILE_NAME;
+                }
+                else if (path.isAbsolute(resolverResultPath)) {
+                    var parentDir = path.dirname(resolverResultPath);
+                    resolverResultPath = parentDir + path.sep + this.getUniqueFolder() + path.sep + ScaClient.SCA_RESOLVER_RESULT_FILE_NAME;
+                }
                 break;
             }
 
         }
-        return pathToEvidenceDir + path.sep + this.getUniqueFolder() + path.sep + ScaClient.SCA_RESOLVER_RESULT_FILE_NAME;
+        return resolverResultPath;
 
     }
     private async copyConfigFileToSourceDir(sourceLocation: string) {
@@ -686,6 +699,10 @@ The Build Failed for the Following Reasons:
         let pathToEvidenceDir = "";
         if (scaResolverAddParams.indexOf("--sast-result-path") !== -1) {
             let sastResultPath = this.getScaResolverSASTResultFilePathFromAdditionalParams(scaResolverAddParams);
+            let fileExists = fs.existsSync(sastResultPath);
+            if (!fileExists) {
+                var sastResultPathFile = fs.openSync(sastResultPath, 'w');
+            }
             if (fs.lstatSync(sastResultPath).isDirectory()) {
                 pathToEvidenceDir = sastResultPath;
                 sastResultPath = sastResultPath + path.sep + this.getUniqueFolder() + path.sep + ScaClient.SAST_RESOLVER_RESULT_FILE_NAME;

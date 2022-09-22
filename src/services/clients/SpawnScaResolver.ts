@@ -38,7 +38,7 @@ export class SpawnScaResolver {
     try{
         let errorOccured = '';
         const child = spawn(scaResolverCommand, [''], {shell: true});
-        log.debug("SCA Resolver command running.");
+        log.debug("Performing SCA scan through SCA Resolver.");
         exitCode = await new Promise( (resolve, reject) => {
             child.stdout.on("data", (x: any) => {
               var data = x.toString();
@@ -63,7 +63,7 @@ export class SpawnScaResolver {
 
               child.on("exit", (code: any) => {
                 log.debug(`Subprocess exit with ${code}.`); 
-                log.debug('SCA Resolver closing.');              
+                log.debug('Finished SCA scan through SCA Resolver.');              
               }); 
 
           child.on('close', resolve);          
