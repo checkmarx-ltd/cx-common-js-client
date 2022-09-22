@@ -38,6 +38,8 @@ import { config } from "process";
 import { SastClient } from "./sastClient";
 import { SpawnScaResolver } from "./SpawnScaResolver";
 import { ProxyHelper } from "../proxyHelper";
+import { spawn } from "child_process";
+import { any } from "micromatch";
 const fs = require('fs');
 ;/**
  * SCA - Software Composition Analysis - is the successor of OSA.
@@ -47,7 +49,7 @@ export class ScaClient {
     public static readonly AUTHENTICATION: string = "identity/connect/token";
     public static readonly TEMP_FILE_NAME_TO_SCA_RESOLVER_RESULTS_ZIP: string = "ScaResolverResults";
     public static readonly SCA_RESOLVER_RESULT_FILE_NAME: string = ".cxsca-results.json";
-    
+
     private static readonly RISK_MANAGEMENT_API: string = "/risk-management/";
     private static readonly PROJECTS: string = ScaClient.RISK_MANAGEMENT_API + "projects";
     private static readonly SUMMARY_REPORT: string = ScaClient.RISK_MANAGEMENT_API + "riskReports/%s/summary";
@@ -74,11 +76,13 @@ export class ScaClient {
         intervalSeconds: 10,
         masterTimeoutMinutes: 20
     };
+    public static readonly SAST_RESOLVER_RESULT_FILE_NAME: string = ".cxsca-sast-results.json";
+
     constructor(private readonly config: ScaConfig,
         private readonly sourceLocation: string,
         private readonly httpClient: HttpClient,
         private readonly log: Logger,
-        private readonly proxyConfig:ProxyConfig,
+        private readonly proxyConfig: ProxyConfig,
         private readonly scanConfig: ScanConfig) {
     }
 
@@ -173,10 +177,10 @@ export class ScaClient {
             let response: any;
             if (locationType === SourceLocationType.REMOTE_REPOSITORY) {
                 response = await this.submitSourceFromRemoteRepo();
-            } else if(this.config.isEnableScaResolver){
+            } else if (this.config.isEnableScaResolver) {
                 response = await this.submitScaResolverEvidenceFile();
-                
-            }else {
+
+            } else {
                 response = await this.submitSourceFromLocalDir();
             }
 
@@ -198,14 +202,14 @@ export class ScaClient {
         return await this.sendStartScanRequest(SourceLocationType.REMOTE_REPOSITORY, repoInfo.url);
     }
 
-    private async getSourceUploadUrl(): Promise<string> {    
+    private async getSourceUploadUrl(): Promise<string> {
         const request = {
             config: [
                 {
-                type:'sca',
-                value: {
-                          "includeSourceCode":this.config.includeSource
-                       }
+                    type: 'sca',
+                    value: {
+                        "includeSourceCode": this.config.includeSource
+                    }
                 }
             ]
         };
@@ -241,7 +245,7 @@ export class ScaClient {
             if (fingerprintsFilePath) {
                 filePathFiltersOr.push(new FilePathFilter(ScaClient.FINGERPRINT_FILE_NAME, ''));
             }
-        }else if (this.config.fingerprintsFilePath) {
+        } else if (this.config.fingerprintsFilePath) {
             throw Error('Conflicting config properties, can\'t save fingerprint file when includeSource flag is set to true.');
         } else {
             this.log.info("Using local directory flow.");
@@ -267,34 +271,45 @@ export class ScaClient {
         return await this.sendStartScanRequest(SourceLocationType.LOCAL_DIRECTORY, uploadedArchiveUrl);
     }
 
-     /**
-     * This method
-     *  1) executes sca resolver to generate result json file.
-     *  2) create ScaResolverResultsxxxx.zip file with sca resolver result json file to be uploaded for scan
-     *  3) Execute initiateScan method to generate SCA scan.
-     * @param scaConfig - AST Sca config object
-     * @return - Returns the response
-     * @throws IOException
-     */
+    /**
+    * This method
+    *  1) executes sca resolver to generate result json file.
+    *  2) create ScaResolverResultsxxxx.zip file with sca resolver result json file to be uploaded for scan
+    *  3) Execute initiateScan method to generate SCA scan.
+    * @param scaConfig - AST Sca config object
+    * @return - Returns the response
+    * @throws IOException
+    */
 
-     private async submitScaResolverEvidenceFile() : Promise<any>{
-    	this.log.info("Sca Resolver Additional Parameters: " + this.config.scaResolverAddParameters);
-        let pathToResultJSONFile:string;
+    private async submitScaResolverEvidenceFile(): Promise<any> {
+        let pathToResultJSONFile: string;
+        let pathToSASRResultJSONFile: string;
+        let resultToZip = '';
         pathToResultJSONFile = this.getScaResolverResultFilePathFromAdditionalParams(this.config.scaResolverAddParameters);
-        this.log.info("Path to the evidence file" + pathToResultJSONFile);
+        this.log.info("Path to the evidence file: " + pathToResultJSONFile);
+        if (this.config.scaResolverAddParameters.indexOf("--sast-result-path") !== -1) {
+            let additionalParameters = this.manageParameters(this.config.scaResolverAddParameters);
+            this.config.scaResolverAddParameters = additionalParameters;
+        }
         let exitCode;
-        await SpawnScaResolver.runScaResolver(this.config.pathToScaResolver, this.config.scaResolverAddParameters,pathToResultJSONFile).then(res => {
+        await SpawnScaResolver.runScaResolver(this.config.pathToScaResolver, this.config.scaResolverAddParameters, pathToResultJSONFile, this.log).then(res => {
             exitCode = res;
-          })
-          let zipFile:string='';
+        })
+        let zipFile: string = '';
         if (exitCode == 0) {
-            this.log.info("SCA resolution completed successfully.");  
-            let resultFilePath :string = pathToResultJSONFile;
-            await this.zipEvidenceFile(resultFilePath).then(res => {
+            this.log.info("Dependencies resolution completed.");
+            let resultFilePath: string = pathToResultJSONFile;
+            resultToZip = pathToResultJSONFile;
+            //check for exploitable path
+            if (this.config.scaResolverAddParameters.indexOf("--sast-result-path") !== -1) {
+                pathToSASRResultJSONFile = this.getScaResolverSASTResultFilePathFromAdditionalParams(this.config.scaResolverAddParameters);
+                resultToZip = resultToZip + ',' + pathToSASRResultJSONFile;
+            }
+            await this.zipEvidenceFile(resultToZip).then(res => {
                 zipFile = res;
-              })
-        }else{
-            throw Error("Error while running sca resolver executable. Exit code:"+exitCode);
+            })
+        } else {
+            throw Error("Error while running sca resolver executable. Exit code:" + exitCode);
         }
         this.log.info('Uploading the zipped data...');
         const uploadedArchiveUrl: string = await this.getSourceUploadUrl();
@@ -302,7 +317,7 @@ export class ScaClient {
         await this.deleteZip(zipFile);
         return this.sendStartScanRequest(SourceLocationType.LOCAL_DIRECTORY, uploadedArchiveUrl);
     }
-   async zipEvidenceFile(resultFilePath:string):Promise<string>{
+    async zipEvidenceFile(resultFilePath: string): Promise<string> {
         const tempFilename = tmpNameSync({ prefix: ScaClient.TEMP_FILE_NAME_TO_SCA_RESOLVER_RESULTS_ZIP, postfix: '.zip' });
         this.log.debug(`Zipping source code at ${resultFilePath} into file ${tempFilename}`);
         const zipper = new Zipper(this.log);
@@ -313,20 +328,33 @@ export class ScaClient {
         return tempFilename;
     }
 
-     getScaResolverResultFilePathFromAdditionalParams(scaResolverAddParams:string): string{
+    getScaResolverResultFilePathFromAdditionalParams(scaResolverAddParams: string): string {
         let argument: Array<string>;
-        let pathToEvidenceDir :string = ""; 
+        let resolverResultPath: string = "";
         argument = scaResolverAddParams.split(" ");
-        for (let i = 0; i <  argument.length ; i++) {
-            if (argument[i] == ("-r") ){
-                pathToEvidenceDir =  argument[i+1];
+        for (let i = 0; i < argument.length; i++) {
+            if (argument[i] == ("-r") || argument[i] == ("--resolver-result-path")) {
+                resolverResultPath = argument[i + 1];
+                let fileExists = fs.existsSync(resolverResultPath);                
+                    if(!fileExists) 
+                    {
+                        var resolverResultPathFile = fs.openSync(resolverResultPath, 'w');
+                    } 
+
+                if (fs.lstatSync(resolverResultPath).isDirectory()) {
+                    resolverResultPath = resolverResultPath + path.sep + this.getUniqueFolder() + path.sep + ScaClient.SCA_RESOLVER_RESULT_FILE_NAME;
+                }
+                else if (path.isAbsolute(resolverResultPath)) {
+                    var parentDir = path.dirname(resolverResultPath);
+                    resolverResultPath = parentDir + path.sep + this.getUniqueFolder() + path.sep + ScaClient.SCA_RESOLVER_RESULT_FILE_NAME;
+                }
                 break;
             }
-                
-        }
-        return pathToEvidenceDir + path.sep + ScaClient.SCA_RESOLVER_RESULT_FILE_NAME;
 
-     }
+        }
+        return resolverResultPath;
+
+    }
     private async copyConfigFileToSourceDir(sourceLocation: string) {
         let arrayOfConfigFilePath = this.config.configFilePaths;
         let format = /[!@#$%^&*()+\-=\[\]{};':"\\|,<>\/?]+/;
@@ -356,7 +384,7 @@ export class ScaClient {
                         fileWritten = fs.createReadStream(sourceFile).pipe(fs.createWriteStream(destDir));
                         this.log.info("Config file (" + sourceFile + ") copied to directory: " + destDir);
                     }
-                }else{
+                } else {
                     this.log.error("File is not present at location : " + sourceFile);
                 }
             }
@@ -404,15 +432,15 @@ export class ScaClient {
         if (this.scanConfig.enableProxy) {
             this.log.info(`scanConfig.enableProxy is TRUE`);
         }
-        if (this.proxyConfig && this.proxyConfig.proxyUrl){
+        if (this.proxyConfig && this.proxyConfig.proxyUrl) {
             this.log.info(`proxyConfig is TRUE`);
             this.log.info(`SCA proxy URL: ` + this.proxyConfig.proxyUrl);
         }
-        if (this.proxyConfig.proxyUrl){
+        if (this.proxyConfig.proxyUrl) {
             this.log.info(`proxyConfig.proxyUrl is TRUE`);
         }
         //proxyConfig is instance of scaProxyConfig so proxyUrl set to proxyConfig proxy url 
-        if ( this.scanConfig.enableProxy && this.proxyConfig && this.proxyConfig.proxyUrl) {
+        if (this.scanConfig.enableProxy && this.proxyConfig && this.proxyConfig.proxyUrl) {
             let proxyUrl = this.proxyConfig.proxyUrl;
             command = `curl -x ${proxyUrl} -X PUT -L "${uploadUrl}" -H "Content-Type:" -T "${file}" --ssl-no-revoke`;
         } else {
@@ -432,9 +460,9 @@ export class ScaClient {
                 },
             },
             config: [{
-                type:'sca',
+                type: 'sca',
                 value: {
-                    "sastProjectId":this.config.sastProjectId,
+                    "sastProjectId": this.config.sastProjectId,
                     "sastServerUrl": this.config.sastServerUrl,
                     "sastUsername": this.config.sastUsername,
                     "sastPassword": this.config.sastPassword,
@@ -446,7 +474,7 @@ export class ScaClient {
         };
         return await this.httpClient.postRequest(ScaClient.CREATE_SCAN, request);
     }
-  
+
     private extractScanIdFrom(response: any): string {
         if (response && response["id"]) {
             return response["id"];
@@ -651,5 +679,82 @@ The Build Failed for the Following Reasons:
             const scaReportResults: ScaReportResults = new ScaReportResults(scaResults, this.config);
             result.scaResults = scaReportResults;
         }
+    }
+
+    public getScaResolverSASTResultFilePathFromAdditionalParams(scaResolverAddParams: string): string {
+        let argument;
+        let pathToEvidenceDir = "";
+        argument = scaResolverAddParams.split(" ");
+        for (let i = 0; i < argument.length; i++) {
+            if (argument[i] == ("--sast-result-path")) {
+                pathToEvidenceDir = argument[i + 1];
+                break;
+            }
+        }
+        return pathToEvidenceDir;
+    }
+
+    public manageParameters(scaResolverAddParams: string) {
+        let newScaResolverAddParams = "";
+        let pathToEvidenceDir = "";
+        if (scaResolverAddParams.indexOf("--sast-result-path") !== -1) {
+            let sastResultPath = this.getScaResolverSASTResultFilePathFromAdditionalParams(scaResolverAddParams);
+            let fileExists = fs.existsSync(sastResultPath);
+            if (!fileExists) {
+                var sastResultPathFile = fs.openSync(sastResultPath, 'w');
+            }
+            if (fs.lstatSync(sastResultPath).isDirectory()) {
+                pathToEvidenceDir = sastResultPath;
+                sastResultPath = sastResultPath + path.sep + this.getUniqueFolder() + path.sep + ScaClient.SAST_RESOLVER_RESULT_FILE_NAME;
+            }
+            else if (path.isAbsolute(sastResultPath)) {
+                var parentDir = path.dirname(sastResultPath);
+                sastResultPath = parentDir + path.sep + this.getUniqueFolder() + path.sep + ScaClient.SAST_RESOLVER_RESULT_FILE_NAME;
+            }
+
+            newScaResolverAddParams = this.setSastResultFilePathFromAdditionalParams(scaResolverAddParams, sastResultPath);
+        }
+        return newScaResolverAddParams;
+    }
+    public setSastResultFilePathFromAdditionalParams(scaResolverAddParams: string, valueToSet: string) {
+        let argument;
+        argument = scaResolverAddParams.split(" ");
+        scaResolverAddParams = '';
+
+        for (let i = 0; i < argument.length; i++) {
+            if (argument[i] == ("--sast-result-path")) {
+                if (argument.length - 1 == i) {
+                    argument[i] = valueToSet;
+                }
+                else {
+                    argument[i + 1] = valueToSet;
+                }
+
+            }
+        }
+        scaResolverAddParams = argument.join(" ");
+        return scaResolverAddParams.toString();
+    }
+
+    public getUniqueFolder() {
+        let date = new Date();
+        const format = {
+            dd: this.formatData((date.getDate())),
+            mm: this.formatData((date.getMonth() + 1)),
+            yyyy: date.getFullYear(),
+            HH: this.formatData((date.getHours())),
+            hh: this.formatData(((date.getHours()))),
+            MM: this.formatData((date.getMinutes())),
+            SS: this.formatData((date.getSeconds())),
+        };
+
+        let timeStamp = format.yyyy.toString() + (format.mm).toString() + (format.dd).toString() + (format.HH).toString() + (format.MM).toString() + (format.SS).toString();
+        return timeStamp;
+    }
+
+    public formatData(input: number) {
+        if (input > 9) {
+            return input;
+        } else return `0${input}`;
     }
 }
