@@ -35,7 +35,7 @@ export default class Zipper {
 
     zipDirectory(srcDir: string, targetPath: string, fingerprintsFile?: string): Promise<ZipResult> {
         this.totalAddedFiles = 0;
-
+        this.srcDir = srcDir;        
         return new Promise<ZipResult>((resolve, reject) => {
             this.archiver = this.createArchiver(reject);
             const zipOutput = this.createOutputStream(targetPath, resolve);
@@ -43,11 +43,9 @@ export default class Zipper {
 
             if (fingerprintsFile) {
                 this.addSingleFileToZip(fingerprintsFile);
-            }
-            let argument = srcDir.split(",");
-            for (let i = 0; i < argument.length; i++) {
-                this.srcDir = argument[i];
-                if (fs.lstatSync(argument[i]).isDirectory()) {
+            }                     
+               
+                if (fs.lstatSync(srcDir).isDirectory()) {
                     this.log.debug('Discovering files in source directory.');
                     // followLinks is set to true to conform to Common Client behavior.
                     const walker = walk(this.srcDir, { followLinks: true });
@@ -57,11 +55,10 @@ export default class Zipper {
                         this.archiver.finalize();
                     });
                 } else {
-                    this.addSingleFileToZip(argument[i]);
-
+                    this.addSingleFileToZip(srcDir);
+                        this.archiver.finalize();
                 }
-            }
-            this.archiver.finalize();
+                       
         });
     }
 
