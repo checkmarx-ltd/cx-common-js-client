@@ -420,7 +420,9 @@ export class ScaClient {
         if (this.scanConfig.enableProxy) {
             this.log.info(`scanConfig.enableProxy is TRUE`);
         }
+
         if (this.proxyConfig && this.proxyConfig.proxyUrl) {
+
             this.log.info(`proxyConfig is TRUE`);
             this.log.info(`SCA proxy URL: ` + this.proxyConfig.proxyUrl);
         }
