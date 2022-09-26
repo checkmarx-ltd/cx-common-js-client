@@ -45,7 +45,7 @@ export default class Zipper {
                 this.addSingleFileToZip(fingerprintsFile);
             }                     
                
-                if (fs.lstatSync(srcDir).isDirectory()) {
+                if (fs.lstatSync(srcDir).isDirectory()) {            
                     this.log.debug('Discovering files in source directory.');
                     // followLinks is set to true to conform to Common Client behavior.
                     const walker = walk(this.srcDir, { followLinks: true });
@@ -57,8 +57,7 @@ export default class Zipper {
                 } else {
                     this.addSingleFileToZip(srcDir);
                         this.archiver.finalize();
-                }
-                       
+                }  
         });
     }
 

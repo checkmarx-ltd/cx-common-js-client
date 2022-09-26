@@ -291,9 +291,8 @@ export class ScaClient {
         pathToResultJSONFile = this.getScaResolverResultFilePathFromAdditionalParams(this.config.scaResolverAddParameters, scaResultPathValue);
         this.log.info("Path to the evidence file: " + pathToResultJSONFile);
         if (this.checkSastResultPath()) {
-            let additionalParameters = this.manageParameters(this.config.scaResolverAddParameters, "--sast-result-path");
-            this.config.scaResolverAddParameters = additionalParameters;
-        }
+            let additionalParameters = this.manageParameters(this.config.scaResolverAddParameters, "--sast-result-path");        
+
         let exitCode;
         await SpawnScaResolver.runScaResolver(this.config.pathToScaResolver, this.config.scaResolverAddParameters, pathToResultJSONFile, this.log).then(res => {
             exitCode = res;
@@ -342,7 +341,7 @@ export class ScaClient {
         }
         return tempFilename;
     }
-    
+
     private async copyConfigFileToSourceDir(sourceLocation: string) {
         let arrayOfConfigFilePath = this.config.configFilePaths;
         let format = /[!@#$%^&*()+\-=\[\]{};':"\\|,<>\/?]+/;
@@ -702,7 +701,7 @@ The Build Failed for the Following Reasons:
         return newScaResolverAddParams;
     }
 
-    public setSastResultFilePathFromAdditionalParams(scaResolverAddParams: string, valueToSet: string, arg: string) {
+    public setSastResultFilePathFromAdditionalParams(scaResolverAddParams: string, valueToSet: string, arg: string) { 
         let argument;
         argument = scaResolverAddParams.split(" ");
         scaResolverAddParams = '';
@@ -723,6 +722,7 @@ The Build Failed for the Following Reasons:
     }
 
     public getTimestampFolder() {
+    
         let date = new Date();
         const format = {
             dd: this.formatData((date.getDate())),
