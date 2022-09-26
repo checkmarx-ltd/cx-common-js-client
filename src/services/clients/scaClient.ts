@@ -292,7 +292,8 @@ export class ScaClient {
         this.log.info("Path to the evidence file: " + pathToResultJSONFile);
         if (this.checkSastResultPath()) {
             let additionalParameters = this.manageParameters(this.config.scaResolverAddParameters, "--sast-result-path");        
-
+            this.config.scaResolverAddParameters = additionalParameters;
+        }
         let exitCode;
         await SpawnScaResolver.runScaResolver(this.config.pathToScaResolver, this.config.scaResolverAddParameters, pathToResultJSONFile, this.log).then(res => {
             exitCode = res;
