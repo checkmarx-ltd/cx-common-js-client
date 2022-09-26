@@ -677,15 +677,25 @@ The Build Failed for the Following Reasons:
         let sastResultPath = this.getScaResolverResultFilePathFromAdditionalParams(scaResolverAddParams, arg);
         let fileExists = fs.existsSync(sastResultPath);
         if (!fileExists) {
-            var sastResultPathFile = fs.openSync(sastResultPath, 'w');
+            let sastResultPathFile = fs.openSync(sastResultPath, 'w');
         }
         if (fs.lstatSync(sastResultPath).isDirectory()) {
             pathToEvidenceDir = sastResultPath;
-            sastResultPath = sastResultPath + path.sep + this.getTimestampFolder() + path.sep + ScaClient.SAST_RESOLVER_RESULT_FILE_NAME;
+            if(arg == "-r" || arg == "--resolver-result-path"){
+                sastResultPath = sastResultPath + path.sep + this.getTimestampFolder() + path.sep + ScaClient.SCA_RESOLVER_RESULT_FILE_NAME;
+                }
+                else if(arg == "--sast-result-path"){
+                    sastResultPath = sastResultPath + path.sep + this.getTimestampFolder() + path.sep + ScaClient.SAST_RESOLVER_RESULT_FILE_NAME;
+                }
         }
         else if (path.isAbsolute(sastResultPath)) {
-            var parentDir = path.dirname(sastResultPath);
+            let parentDir = path.dirname(sastResultPath);
+            if(arg == "-r" || arg == "--resolver-result-path"){
+                sastResultPath = parentDir + path.sep + this.getTimestampFolder() + path.sep + ScaClient.SCA_RESOLVER_RESULT_FILE_NAME;
+                }
+            else if(arg == "--sast-result-path"){
             sastResultPath = parentDir + path.sep + this.getTimestampFolder() + path.sep + ScaClient.SAST_RESOLVER_RESULT_FILE_NAME;
+            }
         }
         newScaResolverAddParams = this.setSastResultFilePathFromAdditionalParams(scaResolverAddParams, sastResultPath, arg);
     
@@ -731,7 +741,9 @@ The Build Failed for the Following Reasons:
     public formatData(input: number) {
         if (input > 9) {
             return input;
-        } else return `0${input}`;
+        } else {
+            return `0${input}`;
+        }
     }
 
     public getScaResolverResultFilePathFromAdditionalParams(scaResolverAddParams: string, arg: string): string {
