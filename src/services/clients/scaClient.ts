@@ -284,7 +284,7 @@ export class ScaClient {
 
     private async submitScaResolverEvidenceFile(): Promise<any> {
         let pathToResultJSONFile: string;
-        let pathToSASRResultJSONFile: string = '';        
+        let pathToSASTResultJSONFile: string = '';        
         let scaResultPathValue = this.getScaResultPathParameter();
         let additionalParameters = this.manageParameters(this.config.scaResolverAddParameters, scaResultPathValue);
         this.config.scaResolverAddParameters = additionalParameters;
@@ -303,26 +303,60 @@ export class ScaClient {
             this.log.info("Dependencies resolution completed."); 
             //check for exploitable path
             if (this.checkSastResultPath()) {
-                pathToSASRResultJSONFile = this.getScaResolverResultFilePathFromAdditionalParams(this.config.scaResolverAddParameters, "--sast-result-path");                
+                pathToSASTResultJSONFile = this.getScaResolverResultFilePathFromAdditionalParams(this.config.scaResolverAddParameters, "--sast-result-path");                
             }
                 //move sca and sast result fingerprints files to temp folder 
                  let parentDir = path.dirname(pathToResultJSONFile);
                  let scaResolverResultDirectory = path.dirname(parentDir);
                  let fileExists = fs.existsSync(parentDir + ScaClient.TEMP_FOLDER_NAME_TO_SCA_RESOLVER_RESULTS);
                  if (!fileExists) {
-                 fs.mkdir(path.join(scaResolverResultDirectory, ScaClient.TEMP_FOLDER_NAME_TO_SCA_RESOLVER_RESULTS), (err: any) => {   
-                    return console.log(err);                                        
-                 });
+                    try {
+                        fs.mkdirSync(path.join(scaResolverResultDirectory, ScaClient.TEMP_FOLDER_NAME_TO_SCA_RESOLVER_RESULTS));
+                        }
+                        catch(err){
+                            this.log.error(err.message.toString());
+                        }    
              }
              scaResolverResultDirectory = scaResolverResultDirectory + path.sep + ScaClient.TEMP_FOLDER_NAME_TO_SCA_RESOLVER_RESULTS.toString();                    
              FileIO.moveFile(pathToResultJSONFile, scaResolverResultDirectory + path.sep + ScaClient.SCA_RESOLVER_RESULT_FILE_NAME);
              if (this.checkSastResultPath()) {
-             FileIO.moveFile(pathToSASRResultJSONFile, scaResolverResultDirectory + path.sep + ScaClient.SAST_RESOLVER_RESULT_FILE_NAME);
+             FileIO.moveFile(pathToSASTResultJSONFile, scaResolverResultDirectory + path.sep + ScaClient.SAST_RESOLVER_RESULT_FILE_NAME);
              }
+             else{
+                let sastResultFilePath = scaResolverResultDirectory + path.sep + ScaClient.SAST_RESOLVER_RESULT_FILE_NAME;
+                if(fs.existsSync(sastResultFilePath))
+                {
+                    fs.unlinkSync(sastResultFilePath);
+                }
+            }
 
+             if(fs.existsSync(parentDir)){  
+                try {                  
+                    fs.rmdirSync(parentDir); 
+                }
+                catch(err)
+                {
+                    this.log.error(err.message.toString());
+                }                    
+            }else{
+                this.log.error("Folder $ {parentDir} can not deleted. ");
+            }
+            if (this.checkSastResultPath()) {
+                let parentDir = path.dirname(pathToSASTResultJSONFile); 
+                if(fs.existsSync(parentDir)){
+                    try {                    
+                    fs.rmdirSync(parentDir);
+                    }
+                    catch(err)
+                    {
+                     this.log.error(err.message.toString());
+                    }                    
+                }
+            }
             await this.zipEvidenceFile(scaResolverResultDirectory).then(res => {
                 zipFile = res;
             })
+
         } else {
             throw Error("Error while running sca resolver executable. Exit code:" + exitCode);
         }
@@ -673,14 +707,37 @@ The Build Failed for the Following Reasons:
     
     public manageParameters(scaResolverAddParams: string, arg: string): string{
         let newScaResolverAddParams = "";
-        let pathToEvidenceDir = "";        
-        let sastResultPath = this.getScaResolverResultFilePathFromAdditionalParams(scaResolverAddParams, arg);
+        let filename = "";        
+        let sastResultPath = this.getScaResolverResultFilePathFromAdditionalParams(scaResolverAddParams, arg);                
         let fileExists = fs.existsSync(sastResultPath);
         if (!fileExists) {
-            let sastResultPathFile = fs.openSync(sastResultPath, 'w');
+            if(path.basename(sastResultPath) != '' && path.extname(sastResultPath)!= '') {
+                filename = path.basename(sastResultPath);
+            }                        
+            if(filename != '') {                
+                let parentDir = path.dirname(sastResultPath);
+                if(!fs.existsSync(parentDir)){
+                    try {
+                        fs.mkdirSync(parentDir, { recursive: true, mode: 0o777});
+                    }
+                    catch(err) {
+                        this.log.error("error: " + err.message.toString());
+                   }
+                }   
+                sastResultPath = parentDir;            
+            }
+            else {
+                try {
+                    fs.mkdirSync(sastResultPath,{ recursive: true, mode: 0o777 });
+                }
+                catch(err) {     
+                    this.log.error("error: " + err.message.toString());
+               }
+            }
         }
-        if (fs.lstatSync(sastResultPath).isDirectory()) {
-            pathToEvidenceDir = sastResultPath;
+        let pathExists = fs.existsSync(sastResultPath);
+        if(pathExists) {
+        if (fs.lstatSync(sastResultPath).isDirectory()) {            
             if(arg == "-r" || arg == "--resolver-result-path"){
                 sastResultPath = sastResultPath + path.sep + this.getTimestampFolder() + path.sep + ScaClient.SCA_RESOLVER_RESULT_FILE_NAME;
                 }
@@ -689,6 +746,7 @@ The Build Failed for the Following Reasons:
                 }
         }
         else if (path.isAbsolute(sastResultPath)) {
+            let originalResultPath = sastResultPath;
             let parentDir = path.dirname(sastResultPath);
             if(arg == "-r" || arg == "--resolver-result-path"){
                 sastResultPath = parentDir + path.sep + this.getTimestampFolder() + path.sep + ScaClient.SCA_RESOLVER_RESULT_FILE_NAME;
@@ -696,9 +754,14 @@ The Build Failed for the Following Reasons:
             else if(arg == "--sast-result-path"){
             sastResultPath = parentDir + path.sep + this.getTimestampFolder() + path.sep + ScaClient.SAST_RESOLVER_RESULT_FILE_NAME;
             }
+            if(fs.existsSync(originalResultPath)){
+                fs.unlinkSync(originalResultPath);
+            } else {
+                this.log.error(originalResultPath + " file can not deleted. ");
+            }
         }
         newScaResolverAddParams = this.setSastResultFilePathFromAdditionalParams(scaResolverAddParams, sastResultPath, arg);
-    
+        }
         return newScaResolverAddParams;
     }
 
