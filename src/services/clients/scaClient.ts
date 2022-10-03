@@ -77,6 +77,7 @@ export class ScaClient {
         masterTimeoutMinutes: 20
     };
     public static readonly SAST_RESOLVER_RESULT_FILE_NAME: string = ".cxsca-sast-results.json";
+    public static readonly TEMP_FOLDER_NAME_TO_SCA_RESOLVER_RESULTS = "ScaResolverResultsTemp";
 
     constructor(private readonly config: ScaConfig,
         private readonly sourceLocation: string,
@@ -282,32 +283,58 @@ export class ScaClient {
     */
 
     private async submitScaResolverEvidenceFile(): Promise<any> {
-        let pathToResultJSONFile: string;
-        let pathToSASRResultJSONFile: string;
-        let resultToZip = '';
-        pathToResultJSONFile = this.getScaResolverResultFilePathFromAdditionalParams(this.config.scaResolverAddParameters);
-        this.log.info("Path to the evidence file: " + pathToResultJSONFile);
-        if (this.config.scaResolverAddParameters.indexOf("--sast-result-path") !== -1) {
-            let additionalParameters = this.manageParameters(this.config.scaResolverAddParameters);
-            this.config.scaResolverAddParameters = additionalParameters;
+        let pathToResultJSONFile: string = '';
+        let pathToSASTResultJSONFile: string = '';        
+
+        let scaResultPathArgName = this.getScaResultPathArgumentName();
+
+        if(scaResultPathArgName != "") {
+            pathToResultJSONFile = this.getScaResolverResultFilePathFromAdditionalParams(this.config.scaResolverAddParameters, scaResultPathArgName);        
         }
+        this.log.info("SCA resolver result path configured: " + pathToResultJSONFile);
+
+        let timeStamp = this.getTimestampFolder();
+        pathToResultJSONFile = this.createTimestampBasedPath(pathToResultJSONFile, timeStamp, ScaClient.SCA_RESOLVER_RESULT_FILE_NAME);
+
+        if (this.checkSastResultPath()) {
+            pathToSASTResultJSONFile = this.getScaResolverResultFilePathFromAdditionalParams(this.config.scaResolverAddParameters, "--sast-result-path");                
+            this.log.info("SAST result path location configured: " + pathToSASTResultJSONFile);
+            pathToSASTResultJSONFile = this.createTimestampBasedPath(pathToSASTResultJSONFile, timeStamp, ScaClient.SAST_RESOLVER_RESULT_FILE_NAME);
+        }
+
         let exitCode;
-        await SpawnScaResolver.runScaResolver(this.config.pathToScaResolver, this.config.scaResolverAddParameters, pathToResultJSONFile, this.log).then(res => {
+        this.log.info("Launching dependency resolution by ScaResolver. ScaResolver logs can be viewed in debug level logs of the pipeline."); 
+        await SpawnScaResolver.runScaResolver(this.config.pathToScaResolver, this.config.scaResolverAddParameters, pathToResultJSONFile, pathToSASTResultJSONFile, this.log).then(res => {
             exitCode = res;
         })
         let zipFile: string = '';
         if (exitCode == 0) {
-            this.log.info("Dependencies resolution completed.");
-            let resultFilePath: string = pathToResultJSONFile;
-            resultToZip = pathToResultJSONFile;
-            //check for exploitable path
-            if (this.config.scaResolverAddParameters.indexOf("--sast-result-path") !== -1) {
-                pathToSASRResultJSONFile = this.getScaResolverSASTResultFilePathFromAdditionalParams(this.config.scaResolverAddParameters);
-                resultToZip = resultToZip + ',' + pathToSASRResultJSONFile;
+            this.log.info("Dependency resolution completed."); 
+            
+            let parentDir = pathToResultJSONFile.substring(0, pathToResultJSONFile.lastIndexOf(path.sep));  
+            let tempDirectory = parentDir +  path.sep + "tmp";
+            if (!fs.existsSync(tempDirectory)){
+                fs.mkdirSync(tempDirectory);
             }
-            await this.zipEvidenceFile(resultToZip).then(res => {
+
+            let tempResultFile =  tempDirectory + path.sep + ScaClient.SCA_RESOLVER_RESULT_FILE_NAME;
+            let tempSASTResultFile =  tempDirectory + path.sep + ScaClient.SAST_RESOLVER_RESULT_FILE_NAME;
+
+            this.log.debug("Copying ScaResolver result files to temporary location.");
+            fs.copyFileSync(pathToResultJSONFile, tempResultFile);
+            if (this.checkSastResultPath()) {
+                fs.copyFileSync(pathToSASTResultJSONFile, tempSASTResultFile);
+            }
+            
+            await this.zipEvidenceFile(tempDirectory).then(res => {
                 zipFile = res;
             })
+           
+            fs.unlinkSync(tempResultFile);
+            fs.unlinkSync(tempSASTResultFile);
+            this.log.debug("Deleting temporary result files of ScaResolver.");
+            fs.rmdirSync(tempDirectory);
+
         } else {
             throw Error("Error while running sca resolver executable. Exit code:" + exitCode);
         }
@@ -328,33 +355,6 @@ export class ScaClient {
         return tempFilename;
     }
 
-    getScaResolverResultFilePathFromAdditionalParams(scaResolverAddParams: string): string {
-        let argument: Array<string>;
-        let resolverResultPath: string = "";
-        argument = scaResolverAddParams.split(" ");
-        for (let i = 0; i < argument.length; i++) {
-            if (argument[i] == ("-r") || argument[i] == ("--resolver-result-path")) {
-                resolverResultPath = argument[i + 1];
-                let fileExists = fs.existsSync(resolverResultPath);                
-                    if(!fileExists) 
-                    {
-                        var resolverResultPathFile = fs.openSync(resolverResultPath, 'w');
-                    } 
-
-                if (fs.lstatSync(resolverResultPath).isDirectory()) {
-                    resolverResultPath = resolverResultPath + path.sep + this.getUniqueFolder() + path.sep + ScaClient.SCA_RESOLVER_RESULT_FILE_NAME;
-                }
-                else if (path.isAbsolute(resolverResultPath)) {
-                    var parentDir = path.dirname(resolverResultPath);
-                    resolverResultPath = parentDir + path.sep + this.getUniqueFolder() + path.sep + ScaClient.SCA_RESOLVER_RESULT_FILE_NAME;
-                }
-                break;
-            }
-
-        }
-        return resolverResultPath;
-
-    }
     private async copyConfigFileToSourceDir(sourceLocation: string) {
         let arrayOfConfigFilePath = this.config.configFilePaths;
         let format = /[!@#$%^&*()+\-=\[\]{};':"\\|,<>\/?]+/;
@@ -682,54 +682,45 @@ The Build Failed for the Following Reasons:
             result.scaResults = scaReportResults;
         }
     }
+    
+   public createTimestampBasedPath(inputResultFilePath: string, timeStamp: string, targetFileName : string){
 
-    public getScaResolverSASTResultFilePathFromAdditionalParams(scaResolverAddParams: string): string {
-        let argument;
-        let pathToEvidenceDir = "";
-        argument = scaResolverAddParams.split(" ");
-        for (let i = 0; i < argument.length; i++) {
-            if (argument[i] == ("--sast-result-path")) {
-                pathToEvidenceDir = argument[i + 1];
-                break;
-            }
-        }
-        return pathToEvidenceDir;
-    }
+        if(inputResultFilePath == "") 
+            return inputResultFilePath;
 
-    public manageParameters(scaResolverAddParams: string) {
-        let newScaResolverAddParams = "";
-        let pathToEvidenceDir = "";
-        if (scaResolverAddParams.indexOf("--sast-result-path") !== -1) {
-            let sastResultPath = this.getScaResolverSASTResultFilePathFromAdditionalParams(scaResolverAddParams);
-            let fileExists = fs.existsSync(sastResultPath);
-            if (!fileExists) {
-                var sastResultPathFile = fs.openSync(sastResultPath, 'w');
+            let lastPathComponent = "";
+            if (!inputResultFilePath.endsWith(path.sep)) {
+                lastPathComponent = inputResultFilePath.substring(inputResultFilePath.lastIndexOf(path.sep)+1, inputResultFilePath.length);
             }
-            if (fs.lstatSync(sastResultPath).isDirectory()) {
-                pathToEvidenceDir = sastResultPath;
-                sastResultPath = sastResultPath + path.sep + this.getUniqueFolder() + path.sep + ScaClient.SAST_RESOLVER_RESULT_FILE_NAME;
+            if (inputResultFilePath.endsWith(path.sep) || lastPathComponent.indexOf(".") == -1) {                     
+                    //if so, it's a directory
+                    if(!inputResultFilePath.endsWith(path.sep))
+                        inputResultFilePath = inputResultFilePath + path.sep ;
+    
+                    inputResultFilePath = inputResultFilePath + timeStamp + path.sep + targetFileName;         
             }
-            else if (path.isAbsolute(sastResultPath)) {
-                var parentDir = path.dirname(sastResultPath);
-                sastResultPath = parentDir + path.sep + this.getUniqueFolder() + path.sep + ScaClient.SAST_RESOLVER_RESULT_FILE_NAME;
+            else {
+             //   let originalResultPath = inputResultFilePath;
+             //   let parentDir = inputResultFilePath.substring(0, inputResultFilePath.lastIndexOf(path.sep));
+             //   inputResultFilePath = parentDir + path.sep + timeStamp + path.sep + targetFileName;
+                return inputResultFilePath;
             }
+        return inputResultFilePath;
+   }
 
-            newScaResolverAddParams = this.setSastResultFilePathFromAdditionalParams(scaResolverAddParams, sastResultPath);
-        }
-        return newScaResolverAddParams;
-    }
-    public setSastResultFilePathFromAdditionalParams(scaResolverAddParams: string, valueToSet: string) {
+    public setSastResultFilePathFromAdditionalParams(scaResolverAddParams: string, valueToSet: string, arg: string) { 
         let argument;
         argument = scaResolverAddParams.split(" ");
         scaResolverAddParams = '';
 
         for (let i = 0; i < argument.length; i++) {
-            if (argument[i] == ("--sast-result-path")) {
+            if (argument[i] == arg) {
                 if (argument.length - 1 == i) {
                     argument[i] = valueToSet;
                 }
                 else {
                     argument[i + 1] = valueToSet;
+
                 }
 
             }
@@ -738,7 +729,8 @@ The Build Failed for the Following Reasons:
         return scaResolverAddParams.toString();
     }
 
-    public getUniqueFolder() {
+    public getTimestampFolder() {
+    
         let date = new Date();
         const format = {
             dd: this.formatData((date.getDate())),
@@ -757,6 +749,44 @@ The Build Failed for the Following Reasons:
     public formatData(input: number) {
         if (input > 9) {
             return input;
-        } else return `0${input}`;
+        } else {
+            return `0${input}`;
+        }
+    }
+
+    public getScaResolverResultFilePathFromAdditionalParams(scaResolverAddParams: string, arg: string): string {
+        let argument;
+        let resolverResultPath = "";
+        argument = scaResolverAddParams.split(" ");
+        for (let i = 0; i < argument.length; i++) {
+            if (argument[i] == arg) {
+                if (argument.length - 1 == i) {
+                resolverResultPath = argument[i];
+                }
+                else {
+                    resolverResultPath = argument[i + 1] ;
+                }
+                break;
+            }
+        }
+        return resolverResultPath;
+    }
+
+    public checkSastResultPath(): boolean {
+        if (this.config.scaResolverAddParameters.indexOf("--sast-result-path") !== -1) {
+            return true;
+        }
+        return false;
+    }
+
+    public getScaResultPathArgumentName(): string {
+        var scaResolverResultPathArgName = "";
+        
+        if (this.config.scaResolverAddParameters.indexOf("--resolver-result-path") !== -1) {
+            scaResolverResultPathArgName = "--resolver-result-path";
+        }else if (this.config.scaResolverAddParameters.indexOf("-r") !== -1) {
+            scaResolverResultPathArgName = "-r";
+        }
+        return scaResolverResultPathArgName;
     }
 }
