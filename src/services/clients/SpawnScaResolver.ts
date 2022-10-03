@@ -13,7 +13,7 @@ export class SpawnScaResolver {
 	 * @param scaResolverAddParams - Additional parameters for SCA resolver
 	 * @return
 	 */
-     static async runScaResolver(pathToScaResolver:string, scaResolverAddParams: string,pathToResultJSONFile:string, log: Logger):Promise<number> {
+     static async runScaResolver(pathToScaResolver:string, scaResolverAddParams: string,pathToResultJSONFile:string, pathToSASTResultJSONFile:string,  log: Logger):Promise<number> {
       let exitCode:number = -100;
       let scaResolverCommand: string;
       let argument: Array<string>;  
@@ -29,8 +29,11 @@ export class SpawnScaResolver {
         {
             scaResolverCommand =scaResolverCommand + " " +pathToResultJSONFile;
             i=i+1;
-        }
-        
+        }else if(arg=="--sast-result-path")
+        {
+            scaResolverCommand =scaResolverCommand + " " +pathToSASTResultJSONFile;
+            i=i+1;
+        }        
 
       }
 
