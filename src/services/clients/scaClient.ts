@@ -277,6 +277,11 @@ export class ScaClient {
     *  1) executes sca resolver to generate result json file.
     *  2) create ScaResolverResultsxxxx.zip file with sca resolver result json file to be uploaded for scan
     *  3) Execute initiateScan method to generate SCA scan.
+    *  4) If absolute file is specified for -r or --sast-result-path or both, files will be created at respective location
+         If directory is specified for -r or --sast-result-path or both, files will be created in respective folder under a timestamp-based folder.
+	     In all cases above and any other variations, files will be copied to ‘tmp’ folder that will be created under the directory used for -r flag . ‘tmp’ folder will be removed as soon as zip gets created. Debug logs added to indicate file copying and deletion.
+	     In all cases where -r is passed, its long switch --resolver-result-path option can also be used
+
     * @param scaConfig - AST Sca config object
     * @return - Returns the response
     * @throws IOException
@@ -331,7 +336,9 @@ export class ScaClient {
             })
            
             fs.unlinkSync(tempResultFile);
-            fs.unlinkSync(tempSASTResultFile);
+            if (this.checkSastResultPath()) {
+                fs.unlinkSync(tempSASTResultFile);
+            }
             this.log.debug("Deleting temporary result files of ScaResolver.");
             fs.rmdirSync(tempDirectory);
 
@@ -687,22 +694,19 @@ The Build Failed for the Following Reasons:
 
         if(inputResultFilePath == "") 
             return inputResultFilePath;
-
             let lastPathComponent = "";
             if (!inputResultFilePath.endsWith(path.sep)) {
                 lastPathComponent = inputResultFilePath.substring(inputResultFilePath.lastIndexOf(path.sep)+1, inputResultFilePath.length);
             }
             if (inputResultFilePath.endsWith(path.sep) || lastPathComponent.indexOf(".") == -1) {                     
-                    //if so, it's a directory
+                    //if so, it's a directory. Create timestamp based directory to avoid overwritting in case of parallel execution of the pipeline.
                     if(!inputResultFilePath.endsWith(path.sep))
                         inputResultFilePath = inputResultFilePath + path.sep ;
     
                     inputResultFilePath = inputResultFilePath + timeStamp + path.sep + targetFileName;         
             }
             else {
-             //   let originalResultPath = inputResultFilePath;
-             //   let parentDir = inputResultFilePath.substring(0, inputResultFilePath.lastIndexOf(path.sep));
-             //   inputResultFilePath = parentDir + path.sep + timeStamp + path.sep + targetFileName;
+                //Honor user's choice to create file at given absolute path
                 return inputResultFilePath;
             }
         return inputResultFilePath;
