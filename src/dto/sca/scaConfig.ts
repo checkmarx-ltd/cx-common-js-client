@@ -32,4 +32,5 @@ export interface ScaConfig {
     isEnableScaResolver: boolean ;
     pathToScaResolver: string;
     scaResolverAddParameters: string;
+    scaScanTimeoutInMinutes?: number;
 }
