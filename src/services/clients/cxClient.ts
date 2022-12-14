@@ -185,16 +185,19 @@ export class CxClient {
             await this.updateProjectCustomFields();
         }
         if (runScanWithSettings) {
-            this.log.debug('start scan with scanWithSettings');
-            const scanResponse: ScanWithSettingsResponse = await this.scanWithSetting() as ScanWithSettingsResponse;
-            this.sastClient.setScanId(scanResponse.id);
-            scanResult.scanId = scanResponse.id;
-        } else {
+            this.log.warning("Cannot reach swagger")
+        }
+
+        this.log.debug('start scan with scanWithSettings');
+        const scanResponse: ScanWithSettingsResponse = await this.scanWithSetting() as ScanWithSettingsResponse;
+        this.sastClient.setScanId(scanResponse.id);
+        scanResult.scanId = scanResponse.id;
+         /*else {
             this.log.debug('start scan with legacy approach');
             await this.updateScanSettings();
             await this.uploadSourceCode();
             scanResult.scanId = await this.sastClient.createScan(this.projectId);
-        }
+        }*/
         const projectStateUrl = url.resolve(this.sastConfig.serverUrl, `CxWebClient/portal#/projectState/${this.projectId}/Summary`);
         this.log.info(`SAST scan created successfully. CxLink to project state: ${projectStateUrl}`);
         this.log.info('Scan id ' + scanResult.scanId);
