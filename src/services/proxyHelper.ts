@@ -1,4 +1,4 @@
-import { ProxyConfig } from "..";
+import {ProxyConfig} from "..";
 
 export class ProxyHelper {
     static getFormattedProxy(proxy: ProxyConfig): string {

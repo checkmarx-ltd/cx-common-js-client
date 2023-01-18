@@ -1,47 +1,40 @@
-import { Logger, PollingSettings, ProxyConfig, SastConfig, ScaConfig, ScanConfig, Waiter } from "../..";
-import { HttpClient } from "./httpClient";
-import { Stopwatch } from "../stopwatch";
-import { ScaLoginSettings } from "../../dto/sca/scaLoginSettings";
-import { SCAResults } from "../../dto/sca/scaResults";
-import { ScaSummaryResults } from "../../dto/sca/report/scaSummaryResults";
-import { Project } from "../../dto/sca/project";
-import { ClientType } from '../../dto/sca/clientType';
-import { ScaResolvingConfiguration } from '../../dto/sca/scaResolvingConfiguration';
-import { Finding } from "../../dto/sca/report/finding";
-import { Package } from "../../dto/sca/report/package";
-import { ScanResults } from '../../dto/scanResults';
-import { SCAWaiter } from '../scaWaiter';
-import { SourceLocationType } from '../../dto/sca/sourceLocationType';
-import { file, tmpName, tmpNameSync } from "tmp";
-import { FilePathFilter } from "../filePathFilter";
+import {Logger, PollingSettings, ProxyConfig, ScaConfig, ScanConfig} from "../..";
+import {HttpClient} from "./httpClient";
+import {Stopwatch} from "../stopwatch";
+import {ScaLoginSettings} from "../../dto/sca/scaLoginSettings";
+import {SCAResults} from "../../dto/sca/scaResults";
+import {ScaSummaryResults} from "../../dto/sca/report/scaSummaryResults";
+import {Project} from "../../dto/sca/project";
+import {ClientType} from '../../dto/sca/clientType';
+import {ScaResolvingConfiguration} from '../../dto/sca/scaResolvingConfiguration';
+import {Finding} from "../../dto/sca/report/finding";
+import {Package} from "../../dto/sca/report/package";
+import {ScanResults} from '../../dto/scanResults';
+import {SCAWaiter} from '../scaWaiter';
+import {SourceLocationType} from '../../dto/sca/sourceLocationType';
+import {tmpNameSync} from "tmp";
+import {FilePathFilter} from "../filePathFilter";
 import Zipper from "../zipper";
 import FileIO from '../fileIO';
-import { TaskSkippedError } from "../../dto/taskSkippedError";
-import { RemoteRepositoryInfo } from '../../dto/sca/remoteRepositoryInfo';
-import { ScaReportResults } from '../../dto/sca/scaReportResults';
+import {TaskSkippedError} from "../../dto/taskSkippedError";
+import {RemoteRepositoryInfo} from '../../dto/sca/remoteRepositoryInfo';
+import {ScaReportResults} from '../../dto/sca/scaReportResults';
 import * as url from "url";
 import * as os from 'os';
-import { ScaSummaryEvaluator } from "../scaSummaryEvaluator";
-import { ScanSummary } from "../../dto/scanSummary";
-import { ScaFingerprintCollector } from '../../dto/sca/scaFingerprintCollector';
+import {ScaSummaryEvaluator} from "../scaSummaryEvaluator";
+import {ScanSummary} from "../../dto/scanSummary";
+import {ScaFingerprintCollector} from '../../dto/sca/scaFingerprintCollector';
 import * as path from "path";
 import ClientTypeResolver from "../clientTypeResolver";
-import { ScanProvider } from "../../dto/api/scanProvider";
-import { PolicyViolationGroup } from "../../dto/api/policyViolationGroup";
-import { ArmStatus } from "../../dto/api/armStatus";
-import { report } from "superagent";
-import { PolicyEvaluation } from "../../dto/api/PolicyEvaluation";
-import { PolicyAction } from "../../dto/api/PolicyAction";
-import { PolicyRule } from "../../dto/api/PolicyRule";
+import {PolicyEvaluation} from "../../dto/api/PolicyEvaluation";
+import {PolicyRule} from "../../dto/api/PolicyRule";
+import {SpawnScaResolver} from "./SpawnScaResolver";
+import {ProxyHelper} from "../proxyHelper";
 
-import { config } from "process";
-import { SastClient } from "./sastClient";
-import { SpawnScaResolver } from "./SpawnScaResolver";
-import { ProxyHelper } from "../proxyHelper";
-import { spawn } from "child_process";
-import { any } from "micromatch";
 const fs = require('fs');
-;/**
+;
+
+/**
  * SCA - Software Composition Analysis - is the successor of OSA.
  */
 export class ScaClient {
@@ -80,11 +73,11 @@ export class ScaClient {
     public static readonly TEMP_FOLDER_NAME_TO_SCA_RESOLVER_RESULTS = "ScaResolverResultsTemp";
 
     constructor(private readonly config: ScaConfig,
-        private readonly sourceLocation: string,
-        private readonly httpClient: HttpClient,
-        private readonly log: Logger,
-        private readonly proxyConfig: ProxyConfig,
-        private readonly scanConfig: ScanConfig) {
+                private readonly sourceLocation: string,
+                private readonly httpClient: HttpClient,
+                private readonly log: Logger,
+                private readonly proxyConfig: ProxyConfig,
+                private readonly scanConfig: ScanConfig) {
     }
 
     private async resolveScaLoginSettings(scaConfig: ScaConfig): Promise<ScaLoginSettings> {
@@ -117,8 +110,7 @@ export class ScaClient {
             this.log.info("Project not found, creating a new one.");
             this.projectId = await this.createProject(projectName);
             this.log.info("Created a project with ID: " + this.projectId);
-        }
-        else {
+        } else {
             this.log.info("Project already exists with ID: " + this.projectId);
         }
     }
@@ -223,7 +215,7 @@ export class ScaClient {
     }
 
     private async submitSourceFromLocalDir(): Promise<any> {
-        const tempFilename = tmpNameSync({ prefix: 'cxsrc-', postfix: '.zip' });
+        const tempFilename = tmpNameSync({prefix: 'cxsrc-', postfix: '.zip'});
         let filePathFiltersAnd: FilePathFilter[] = [new FilePathFilter(this.config.dependencyFileExtension, this.config.dependencyFolderExclusion)];
         let filePathFiltersOr: FilePathFilter[] = [];
         let fingerprintsFilePath = '';
@@ -273,28 +265,28 @@ export class ScaClient {
     }
 
     /**
-    * This method
-    *  1) executes sca resolver to generate result json file.
-    *  2) create ScaResolverResultsxxxx.zip file with sca resolver result json file to be uploaded for scan
-    *  3) Execute initiateScan method to generate SCA scan.
-    *  4) If absolute file is specified for -r or --sast-result-path or both, files will be created at respective location
-         If directory is specified for -r or --sast-result-path or both, files will be created in respective folder under a timestamp-based folder.
-	     In all cases above and any other variations, files will be copied to ‘tmp’ folder that will be created under the directory used for -r flag . ‘tmp’ folder will be removed as soon as zip gets created. Debug logs added to indicate file copying and deletion.
-	     In all cases where -r is passed, its long switch --resolver-result-path option can also be used
+     * This method
+     *  1) executes sca resolver to generate result json file.
+     *  2) create ScaResolverResultsxxxx.zip file with sca resolver result json file to be uploaded for scan
+     *  3) Execute initiateScan method to generate SCA scan.
+     *  4) If absolute file is specified for -r or --sast-result-path or both, files will be created at respective location
+     If directory is specified for -r or --sast-result-path or both, files will be created in respective folder under a timestamp-based folder.
+     In all cases above and any other variations, files will be copied to ‘tmp’ folder that will be created under the directory used for -r flag . ‘tmp’ folder will be removed as soon as zip gets created. Debug logs added to indicate file copying and deletion.
+     In all cases where -r is passed, its long switch --resolver-result-path option can also be used
 
-    * @param scaConfig - AST Sca config object
-    * @return - Returns the response
-    * @throws IOException
-    */
+     * @param scaConfig - AST Sca config object
+     * @return - Returns the response
+     * @throws IOException
+     */
 
     private async submitScaResolverEvidenceFile(): Promise<any> {
         let pathToResultJSONFile: string = '';
-        let pathToSASTResultJSONFile: string = '';        
+        let pathToSASTResultJSONFile: string = '';
 
         let scaResultPathArgName = this.getScaResultPathArgumentName();
 
-        if(scaResultPathArgName != "") {
-            pathToResultJSONFile = this.getScaResolverResultFilePathFromAdditionalParams(this.config.scaResolverAddParameters, scaResultPathArgName);        
+        if (scaResultPathArgName != "") {
+            pathToResultJSONFile = this.getScaResolverResultFilePathFromAdditionalParams(this.config.scaResolverAddParameters, scaResultPathArgName);
         }
         this.log.info("SCA resolver result path configured: " + pathToResultJSONFile);
 
@@ -302,39 +294,39 @@ export class ScaClient {
         pathToResultJSONFile = this.createTimestampBasedPath(pathToResultJSONFile, timeStamp, ScaClient.SCA_RESOLVER_RESULT_FILE_NAME);
 
         if (this.checkSastResultPath()) {
-            pathToSASTResultJSONFile = this.getScaResolverResultFilePathFromAdditionalParams(this.config.scaResolverAddParameters, "--sast-result-path");                
+            pathToSASTResultJSONFile = this.getScaResolverResultFilePathFromAdditionalParams(this.config.scaResolverAddParameters, "--sast-result-path");
             this.log.info("SAST result path location configured: " + pathToSASTResultJSONFile);
             pathToSASTResultJSONFile = this.createTimestampBasedPath(pathToSASTResultJSONFile, timeStamp, ScaClient.SAST_RESOLVER_RESULT_FILE_NAME);
         }
 
         let exitCode;
-        this.log.info("Launching dependency resolution by ScaResolver. ScaResolver logs can be viewed in debug level logs of the pipeline."); 
+        this.log.info("Launching dependency resolution by ScaResolver. ScaResolver logs can be viewed in debug level logs of the pipeline.");
         await SpawnScaResolver.runScaResolver(this.config.pathToScaResolver, this.config.scaResolverAddParameters, pathToResultJSONFile, pathToSASTResultJSONFile, this.log).then(res => {
             exitCode = res;
         })
         let zipFile: string = '';
         if (exitCode == 0) {
-            this.log.info("Dependency resolution completed."); 
-            
-            let parentDir = pathToResultJSONFile.substring(0, pathToResultJSONFile.lastIndexOf(path.sep));  
-            let tempDirectory = parentDir +  path.sep + "tmp";
-            if (!fs.existsSync(tempDirectory)){
+            this.log.info("Dependency resolution completed.");
+
+            let parentDir = pathToResultJSONFile.substring(0, pathToResultJSONFile.lastIndexOf(path.sep));
+            let tempDirectory = parentDir + path.sep + "tmp";
+            if (!fs.existsSync(tempDirectory)) {
                 fs.mkdirSync(tempDirectory);
             }
 
-            let tempResultFile =  tempDirectory + path.sep + ScaClient.SCA_RESOLVER_RESULT_FILE_NAME;
-            let tempSASTResultFile =  tempDirectory + path.sep + ScaClient.SAST_RESOLVER_RESULT_FILE_NAME;
+            let tempResultFile = tempDirectory + path.sep + ScaClient.SCA_RESOLVER_RESULT_FILE_NAME;
+            let tempSASTResultFile = tempDirectory + path.sep + ScaClient.SAST_RESOLVER_RESULT_FILE_NAME;
 
             this.log.debug("Copying ScaResolver result files to temporary location.");
             fs.copyFileSync(pathToResultJSONFile, tempResultFile);
             if (this.checkSastResultPath()) {
                 fs.copyFileSync(pathToSASTResultJSONFile, tempSASTResultFile);
             }
-            
+
             await this.zipEvidenceFile(tempDirectory).then(res => {
                 zipFile = res;
             })
-           
+
             fs.unlinkSync(tempResultFile);
             if (this.checkSastResultPath()) {
                 fs.unlinkSync(tempSASTResultFile);
@@ -351,8 +343,12 @@ export class ScaClient {
         await this.deleteZip(zipFile);
         return this.sendStartScanRequest(SourceLocationType.LOCAL_DIRECTORY, uploadedArchiveUrl);
     }
+
     async zipEvidenceFile(resultFilePath: string): Promise<string> {
-        const tempFilename = tmpNameSync({ prefix: ScaClient.TEMP_FILE_NAME_TO_SCA_RESOLVER_RESULTS_ZIP, postfix: '.zip' });
+        const tempFilename = tmpNameSync({
+            prefix: ScaClient.TEMP_FILE_NAME_TO_SCA_RESOLVER_RESULTS_ZIP,
+            postfix: '.zip'
+        });
         this.log.debug(`Zipping source code at ${resultFilePath} into file ${tempFilename}`);
         const zipper = new Zipper(this.log);
         const zipResult = await zipper.zipDirectory(resultFilePath, tempFilename);
@@ -439,23 +435,23 @@ export class ScaClient {
         if (this.scanConfig.enableProxy) {
             this.log.info(`scanConfig.enableProxy is TRUE`);
         }
-
-        if (this.proxyConfig && this.proxyConfig.proxyUrl) {
-
-            this.log.info(`proxyConfig is TRUE`);
-            this.log.info(`SCA proxy URL: ` + this.proxyConfig.proxyUrl);
+        if (this.proxyConfig) {
+            this.log.info(`Proxy is configured`);
+            this.log.info(`SAST proxy URL: ` + this.proxyConfig.proxyUrl);
+            this.log.info(`SCA proxy URL: ` + this.proxyConfig.scaProxyUrl);
         }
-        if (this.proxyConfig.proxyUrl) {
-            this.log.info(`proxyConfig.proxyUrl is TRUE`);
+        if (this.proxyConfig.scaProxyUrl) {
+            this.log.info(`proxyConfig.scaProxyUrl is TRUE`);
         }
-        //proxyConfig is instance of scaProxyConfig so proxyUrl set to proxyConfig proxy url 
-        if (this.scanConfig.enableProxy && this.proxyConfig && this.proxyConfig.proxyUrl) {
-            let proxyUrl = this.proxyConfig.proxyUrl;
+
+        if (this.scanConfig.enableProxy && this.proxyConfig && this.proxyConfig.scaProxyUrl) {
+            let proxyUrl = ProxyHelper.getFormattedProxy(this.proxyConfig);
             command = `curl -x ${proxyUrl} -X PUT -L "${uploadUrl}" -H "Content-Type:" -T "${file}" --ssl-no-revoke`;
         } else {
+            this.log.info(`No proxy being used to AWS upload`);
             command = `curl -X PUT -L "${uploadUrl}" -H "Content-Type:" -T "${file}" --ssl-no-revoke`;
         }
-        child_process.execSync(command, { stdio: 'pipe' });
+        child_process.execSync(command, {stdio: 'pipe'});
     }
 
     private async sendStartScanRequest(sourceLocation: SourceLocationType, sourceUrl: string): Promise<any> {
@@ -581,7 +577,7 @@ The Build Failed for the Following Reasons:
 
     private async getProjectViolations(reportID: string): Promise<PolicyEvaluation[]> {
         const path = `policy-management/policy-evaluation/?reportId=${reportID}`;
-        return this.httpClient.getRequest(path, { baseUrlOverride: this.config.apiUrl });
+        return this.httpClient.getRequest(path, {baseUrlOverride: this.config.apiUrl});
     }
 
     private async retrieveScanResults(): Promise<SCAResults> {
@@ -604,8 +600,7 @@ The Build Failed for the Following Reasons:
             result.scaResultReady = true;
             this.log.info("Retrieved CxSCA results successfully.");
             return result;
-        }
-        catch (err) {
+        } catch (err) {
             throw Error("Error retrieving CxSCA scan results. " + err.message);
         }
     }
@@ -689,30 +684,29 @@ The Build Failed for the Following Reasons:
             result.scaResults = scaReportResults;
         }
     }
-    
-   public createTimestampBasedPath(inputResultFilePath: string, timeStamp: string, targetFileName : string){
 
-        if(inputResultFilePath == "") 
+    public createTimestampBasedPath(inputResultFilePath: string, timeStamp: string, targetFileName: string) {
+
+        if (inputResultFilePath == "")
             return inputResultFilePath;
-            let lastPathComponent = "";
-            if (!inputResultFilePath.endsWith(path.sep)) {
-                lastPathComponent = inputResultFilePath.substring(inputResultFilePath.lastIndexOf(path.sep)+1, inputResultFilePath.length);
-            }
-            if (inputResultFilePath.endsWith(path.sep) || lastPathComponent.indexOf(".") == -1) {                     
-                    //if so, it's a directory. Create timestamp based directory to avoid overwritting in case of parallel execution of the pipeline.
-                    if(!inputResultFilePath.endsWith(path.sep))
-                        inputResultFilePath = inputResultFilePath + path.sep ;
-    
-                    inputResultFilePath = inputResultFilePath + timeStamp + path.sep + targetFileName;         
-            }
-            else {
-                //Honor user's choice to create file at given absolute path
-                return inputResultFilePath;
-            }
-        return inputResultFilePath;
-   }
+        let lastPathComponent = "";
+        if (!inputResultFilePath.endsWith(path.sep)) {
+            lastPathComponent = inputResultFilePath.substring(inputResultFilePath.lastIndexOf(path.sep) + 1, inputResultFilePath.length);
+        }
+        if (inputResultFilePath.endsWith(path.sep) || lastPathComponent.indexOf(".") == -1) {
+            //if so, it's a directory. Create timestamp based directory to avoid overwritting in case of parallel execution of the pipeline.
+            if (!inputResultFilePath.endsWith(path.sep))
+                inputResultFilePath = inputResultFilePath + path.sep;
 
-    public setSastResultFilePathFromAdditionalParams(scaResolverAddParams: string, valueToSet: string, arg: string) { 
+            inputResultFilePath = inputResultFilePath + timeStamp + path.sep + targetFileName;
+        } else {
+            //Honor user's choice to create file at given absolute path
+            return inputResultFilePath;
+        }
+        return inputResultFilePath;
+    }
+
+    public setSastResultFilePathFromAdditionalParams(scaResolverAddParams: string, valueToSet: string, arg: string) {
         let argument;
         argument = scaResolverAddParams.split(" ");
         scaResolverAddParams = '';
@@ -721,8 +715,7 @@ The Build Failed for the Following Reasons:
             if (argument[i] == arg) {
                 if (argument.length - 1 == i) {
                     argument[i] = valueToSet;
-                }
-                else {
+                } else {
                     argument[i + 1] = valueToSet;
 
                 }
@@ -734,7 +727,7 @@ The Build Failed for the Following Reasons:
     }
 
     public getTimestampFolder() {
-    
+
         let date = new Date();
         const format = {
             dd: this.formatData((date.getDate())),
@@ -765,10 +758,9 @@ The Build Failed for the Following Reasons:
         for (let i = 0; i < argument.length; i++) {
             if (argument[i] == arg) {
                 if (argument.length - 1 == i) {
-                resolverResultPath = argument[i];
-                }
-                else {
-                    resolverResultPath = argument[i + 1] ;
+                    resolverResultPath = argument[i];
+                } else {
+                    resolverResultPath = argument[i + 1];
                 }
                 break;
             }
@@ -785,10 +777,10 @@ The Build Failed for the Following Reasons:
 
     public getScaResultPathArgumentName(): string {
         var scaResolverResultPathArgName = "";
-        
+
         if (this.config.scaResolverAddParameters.indexOf("--resolver-result-path") !== -1) {
             scaResolverResultPathArgName = "--resolver-result-path";
-        }else if (this.config.scaResolverAddParameters.indexOf("-r") !== -1) {
+        } else if (this.config.scaResolverAddParameters.indexOf("-r") !== -1) {
             scaResolverResultPathArgName = "-r";
         }
         return scaResolverResultPathArgName;

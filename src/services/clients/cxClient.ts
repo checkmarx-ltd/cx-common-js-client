@@ -128,9 +128,9 @@ export class CxClient {
 
         if (!httpClient) 
         {
-            if (this.config.enableProxy && this.config.proxyConfig && (this.proxyConfig.proxyHost != '' || this.proxyConfig.proxyUrl != '' || this.proxyConfig.sastProxyUrl != '')) 
+            if (this.config.enableProxy && this.config.proxyConfig && this.proxyConfig.sastProxyUrl != '')
             {
-                sastProxyConfig.proxyUrl = this.proxyConfig.sastProxyUrl != '' ? this.proxyConfig.sastProxyUrl : this.proxyConfig.proxyUrl;
+                sastProxyConfig.proxyUrl = this.proxyConfig.sastProxyUrl;
                 sastProxyConfig.sastProxyUrl = '';
                 sastProxyConfig.scaProxyUrl = '';
                 this.httpClient = new HttpClient(baseUrl, this.config.cxOrigin, this.config.cxOriginUrl, this.log, sastProxyConfig, this.sastConfig.cacert_chainFilePath);
@@ -158,12 +158,10 @@ export class CxClient {
         let scaHttpClient: HttpClient;
         let scaProxyConfig = JSON.parse(JSON.stringify(this.config.proxyConfig));
 
-        if (this.config.enableProxy && this.config.proxyConfig && (this.proxyConfig.proxyHost != '' || this.proxyConfig.proxyUrl != '' || this.proxyConfig.scaProxyUrl != '')) 
+        if (this.config.enableProxy && this.config.proxyConfig && this.proxyConfig.scaProxyUrl != '')
         {
-            scaProxyConfig.proxyUrl = this.proxyConfig.scaProxyUrl != '' ? this.proxyConfig.scaProxyUrl : this.proxyConfig.proxyUrl;
-            scaProxyConfig.sastProxyUrl = '';
-            scaProxyConfig.scaProxyUrl = '';
-            this.log.info("Overriten URL "+this.config.proxyConfig.sastProxyUrl);
+            scaProxyConfig.proxyUrl = this.proxyConfig.scaProxyUrl;
+            this.log.info("Overwritten URL " + scaProxyConfig.proxyUrl);
             scaHttpClient = new HttpClient(this.scaConfig.apiUrl, this.config.cxOrigin, this.config.cxOriginUrl,this.log, scaProxyConfig, this.scaConfig.cacert_chainFilePath);
         } 
         else 
