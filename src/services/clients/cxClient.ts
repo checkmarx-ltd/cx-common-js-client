@@ -100,7 +100,7 @@ export class CxClient {
 
         return result;
     }
-    
+
     private async generatePDFReport(scanResult: ScanResults){
         this.log.info("Generating PDF Report");
         const client = new ReportingClient(this.httpClient, this.log, "PDF");
@@ -244,11 +244,38 @@ export class CxClient {
             customFields: temp_customFields
         });
     }
+    private async isPrioriVersion(version: string, proirToVersion: string): Promise<boolean> {
+        try {
+            const value = version.split(".");
+            var currentVersion = (value[0]) + "." + (value[1]) + (value[2]) + (value[3]);
+            if (parseFloat(currentVersion) > parseFloat(proirToVersion)) {
+                return true;
+            }
+            else {
+                return false;
+            }
+        } catch (e: any) {
+            return false;
+        }
+    }
 
     async isScanWithSettingsSupported(): Promise<boolean> {
         try {
-            const swaggerResponse = await this.httpClient.getRequest(this.swaggerLocation, { suppressWarnings: true })
-            return swaggerResponse.paths.hasOwnProperty('/sast/scanWithSettings');
+            let versionInfo = await this.getVersionInfo();
+            let version = versionInfo.version;
+            var isPrioriVersionSupported = this.isPrioriVersion(version, '9.3');
+            return isPrioriVersionSupported
+        } catch (e) {
+            return false;
+        }
+    }
+
+    async isScanLevelCustomFieldSupported(): Promise<boolean> {
+        try {
+            let versionInfo = await this.getVersionInfo();
+            let version = versionInfo.version;
+            var isScanLevelCustomField = this.isPrioriVersion(version, '9.4');
+            return isScanLevelCustomField
         } catch (e) {
             return false;
         }
@@ -306,10 +333,8 @@ export class CxClient {
         this.log.info(`Uploading the zipped source code.`);
         let isOverrideProjectSettings = false;
         var apiVersionHeader = {};
-        let versionInfo = await this.getVersionInfo();
-        let version = versionInfo.version;
-        if(version.includes('9.4')){
-            apiVersionHeader = {'Content-type' : 'application/json;v=1.2'};
+        if (await this.isScanLevelCustomFieldSupported()) {
+            apiVersionHeader = { 'Content-type': 'application/json;v=1.2' };
         }
         isOverrideProjectSettings = this.sastConfig.overrideProjectSettings || this.isNewProject;
         const scanResponse: ScanWithSettingsResponse = await this.httpClient.postMultipartRequest('sast/scanWithSettings',
