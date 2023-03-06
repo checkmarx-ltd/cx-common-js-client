@@ -244,11 +244,11 @@ export class CxClient {
             customFields: temp_customFields
         });
     }
-    private async isPrioriVersion(version: string, proirToVersion: string): Promise<boolean> {
+    private async isPriorVersion(version: string, proirToVersion: string): Promise<boolean> {
         try {
             const value = version.split(".");
-            var currentVersion = (value[0]) + "." + (value[1]) + (value[2]) + (value[3]);
-            if (parseFloat(currentVersion) > parseFloat(proirToVersion)) {
+            var currentVersion = (value[0]) + "." + (value[1]);
+            if (parseFloat(currentVersion) < parseFloat(proirToVersion)) {
                 return true;
             }
             else {
@@ -259,23 +259,13 @@ export class CxClient {
         }
     }
 
-    async isScanWithSettingsSupported(): Promise<boolean> {
+    private async isScanWithSettingsSupported(): Promise<boolean> {
         try {
             let versionInfo = await this.getVersionInfo();
             let version = versionInfo.version;
-            var isPrioriVersionSupported = this.isPrioriVersion(version, '9.3');
-            return isPrioriVersionSupported
-        } catch (e) {
-            return false;
-        }
-    }
-
-    async isScanLevelCustomFieldSupported(): Promise<boolean> {
-        try {
-            let versionInfo = await this.getVersionInfo();
-            let version = versionInfo.version;
-            var isScanLevelCustomField = this.isPrioriVersion(version, '9.4');
-            return isScanLevelCustomField
+            const isPriorVersionSupported: boolean = await this.isPriorVersion(version, '9.3');
+            return !isPriorVersionSupported
+            
         } catch (e) {
             return false;
         }
@@ -326,6 +316,16 @@ export class CxClient {
         }
 
         return projectId;
+    }
+    private async isScanLevelCustomFieldSupported(): Promise<boolean> {
+        try {
+            let versionInfo =await this.getVersionInfo();
+            let version = versionInfo.version;
+            const isScanLevelCustomField: boolean = await this.isPriorVersion(version, '9.4');
+            return !isScanLevelCustomField
+        } catch (e) {
+            return false;
+        }
     }
 
     private async scanWithSetting(): Promise<ScanWithSettingsResponse> {
