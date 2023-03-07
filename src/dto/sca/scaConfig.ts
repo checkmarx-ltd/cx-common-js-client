@@ -27,6 +27,8 @@ export interface ScaConfig {
     configFilePaths:string[];
     envVariables:Map<string, string>;
     scaSastTeam:string;
+    projectCustomTags:string;
+    scanCustomTags:string;
     isExploitable:boolean;
     cacert_chainFilePath: string;
     isEnableScaResolver: boolean ;
