@@ -234,16 +234,31 @@ export class ScaClient {
         if (!Boolean(this.config.includeSource)) {
             this.log.info("Using manifest and fingerprint flow.");
             const projectResolvingConfiguration = await this.fetchProjectResolvingConfiguration();
-            const manifestsIncludeFilter = new FilePathFilter(projectResolvingConfiguration.getManifestsIncludePattern(), '')
+            let manifestInclude = projectResolvingConfiguration.getManifestsIncludePattern();
+            if (this.config.manifestPattern) {
+                let manifestUI = (this.config.manifestPattern).replace(/\s/g, "");
+                if (manifestInclude)
+                    manifestInclude = manifestInclude.concat(',', manifestUI);
+                else
+                    manifestInclude = manifestUI;
+            }
+            const manifestsIncludeFilter = new FilePathFilter(manifestInclude, '');
 
             if (!manifestsIncludeFilter.hasInclude())
                 throw Error(`Using manifest only mode requires include filter. Resolving config does not have include patterns defined: ${projectResolvingConfiguration.getManifestsIncludePattern()}`)
 
             filePathFiltersOr.push(manifestsIncludeFilter);
+            let fingerprintInclude = projectResolvingConfiguration.getFingerprintsIncludePattern();
+            if (this.config.fingerprintPattern) {
+                let fingerprintUI = (this.config.fingerprintPattern).replace(/\s/g, "");
+                if (fingerprintInclude)
+                    fingerprintInclude = fingerprintInclude.concat(',', fingerprintUI);
+                else
+                    fingerprintInclude = fingerprintUI;
+            }
+            fingerprintsFilePath = await this.createScanFingerprintsFile([...filePathFiltersAnd, new FilePathFilter(fingerprintInclude, '')]);
 
-            fingerprintsFilePath = await this.createScanFingerprintsFile([...filePathFiltersAnd, new FilePathFilter(projectResolvingConfiguration.getFingerprintsIncludePattern(), '')]);
-
-            if (fingerprintsFilePath) {
+            if (fingerprintsFilePath) { 
                 filePathFiltersOr.push(new FilePathFilter(ScaClient.FINGERPRINT_FILE_NAME, ''));
             }
         } else if (this.config.fingerprintsFilePath) {

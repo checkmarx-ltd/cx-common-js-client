@@ -30,6 +30,8 @@ export interface ScaConfig {
     projectCustomTags:string;
     scanCustomTags:string;
     isExploitable:boolean;
+    manifestPattern:String;
+    fingerprintPattern:String;
     cacert_chainFilePath: string;
     isEnableScaResolver: boolean ;
     pathToScaResolver: string;
