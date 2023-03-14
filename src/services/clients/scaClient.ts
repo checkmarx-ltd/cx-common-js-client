@@ -814,28 +814,27 @@ The Build Failed for the Following Reasons:
         return scaResolverResultPathArgName;
     }
 
- private normalizeTags(input : string | undefined) {
-    let tags = input || '';
-    tags = tags.replace(/\s/g,"");
-    let tagArray = tags.split(',');
-    let tagObj: {[k: string]: string} ={};
-    for(let i = 0; i < tagArray.length; i++) {
-        this.log.debug("Custom Tags: ");
-        let tag = tagArray[i];
-        let tempArr = tag.split(':');
-        if(tempArr.length == 2) {
-            if(tempArr[0].length > 250 || tempArr[1].length > 250) 
-                this.log.warning("Either key or value has character length more than 250. Ignoring the provided input tag: "+tag+".");
-            else {
-                tagObj[tempArr[0]] = tempArr[1];
-                this.log.debug("Key: "+tempArr[0]+", Value: "+tempArr[1]);
+    private normalizeTags(input: string | undefined) {
+        let tags = input || '';
+        tags = tags.replace(/\s/g, "");
+        let tagArray = tags.split(',');
+        let tagObj: { [k: string]: string } = {};
+        for (let tag of tagArray) {
+            this.log.debug("Custom Tags: ");
+            let tempArr = tag.split(':');
+            if (tempArr.length == 2) {
+                if (tempArr[0].length > 250 || tempArr[1].length > 250)
+                    this.log.warning("Either key or value has character length more than 250. Ignoring the provided input tag: " + tag + ".");
+                else {
+                    tagObj[tempArr[0]] = tempArr[1];
+                    this.log.debug("Key: " + tempArr[0] + ", Value: " + tempArr[1]);
+                }
             }
+            else
+                this.log.warning("Provided Input tag: " + tag + " has incorrect syntax, Ignoring it.");
         }
-        else 
-            this.log.warning("Provided Input tag: "+tag+" has incorrect syntax, Ignoring it.");
+        return tagObj;
     }
-   return tagObj;
-}
 
     private async updateProjectCustomTags(): Promise<void> {
         this.log.debug("Updating Project Custom Tags");
