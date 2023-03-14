@@ -477,17 +477,8 @@ export class ScaClient {
         this.log.info("Sending a request to start scan.");
         await this.updateProjectCustomTags();
         let scanCustomTagObj = {};
-        if (this.config.scanCustomTags) {
-            let scanCustomTags = this.normalizeTags(this.config.scanCustomTags);
-            if (scanCustomTags.size > 0) {
-                scanCustomTagObj = Array.from(scanCustomTags).reduce((scanCustomTagObj, [key, value]) => (
-                    Object.assign(scanCustomTagObj, { [key]: value })), {});
-                this.log.debug("Scan Custom tags: ");
-                scanCustomTags.forEach((value: string, key: string) => {
-                    this.log.debug(key + ":" + value);
-                });
-            }
-        }
+        if (this.config.scanCustomTags) 
+            scanCustomTagObj = this.normalizeTags(this.config.scanCustomTags);
         const request = {
             project: {
                 id: this.projectId,
@@ -827,46 +818,44 @@ The Build Failed for the Following Reasons:
     let tags = input || '';
     tags = tags.replace(/\s/g,"");
     let tagArray = tags.split(',');
-    let tagMap = new Map<string, string>();
+    let tagObj: {[k: string]: string} ={};
     for(let i = 0; i < tagArray.length; i++) {
+        this.log.debug("Custom Tags: ");
         let tag = tagArray[i];
         let tempArr = tag.split(':');
         if(tempArr.length == 2) {
             if(tempArr[0].length > 250 || tempArr[1].length > 250) 
                 this.log.warning("Either key or value has character length more than 250. Ignoring the provided input tag: "+tag+".");
-            else 
-                tagMap.set(tempArr[0], tempArr[1]);
+            else {
+                tagObj[tempArr[0]] = tempArr[1];
+                this.log.debug("Key: "+tempArr[0]+", Value: "+tempArr[1]);
+            }
         }
         else 
             this.log.warning("Provided Input tag: "+tag+" has incorrect syntax, Ignoring it.");
     }
-   return tagMap;
+   return tagObj;
 }
 
     private async updateProjectCustomTags(): Promise<void> {
         this.log.debug("Updating Project Custom Tags");
         let projectCustomTagObj = {};
-        if (this.config.projectCustomTags) {
-            let projectCustomTags = this.normalizeTags(this.config.projectCustomTags);
-            if (projectCustomTags.size > 0) {
-                projectCustomTagObj = Array.from(projectCustomTags).reduce((projectCustomTagObj, [key, value]) => (
-                    Object.assign(projectCustomTagObj, { [key]: value })), {});
-                this.log.debug("Project Custom tags: ");
-                projectCustomTags.forEach((value: string, key: string) => {
-                    this.log.debug(key + ":" + value);
-                });
-            }
+        try {
+            if (this.config.projectCustomTags) 
+                projectCustomTagObj = this.normalizeTags(this.config.projectCustomTags);
+            let projectId = this.projectId;
+            let path = ScaClient.PROJECTS + `/${projectId}`;
+            const teamName = this.config.scaSastTeam;
+            let teamNameArray: Array<string | undefined> = [teamName];
+            const request = {
+                name: this.scanConfig.projectName,
+                AssignedTeams: teamNameArray,
+                tags: projectCustomTagObj
+            };
+            await this.httpClient.putRequest(path, request);
+        } catch (err) {
+            this.log.error("Error occurred while updating project tags: " + err.message);
         }
-        let projectId = this.projectId;
-        let path = ScaClient.PROJECTS + `/${projectId}`;
-        const teamName = this.config.scaSastTeam;
-        let teamNameArray: Array<string | undefined> = [teamName];
-        const request = {
-            name: this.scanConfig.projectName,
-            AssignedTeams: teamNameArray,
-            tags: projectCustomTagObj
-        };
-        await this.httpClient.putRequest(path, request);
     }
 
 }
