@@ -527,7 +527,7 @@ The Build Failed for the Following Reasons:
 
     public async waitForScanResults(result: ScanResults) {
         this.log.info("------------------------------------ Get CxSCA Results -----------------------------------");
-        const waiter: SCAWaiter = new SCAWaiter(this.scanId, this.httpClient, this.stopwatch, this.log);
+        const waiter: SCAWaiter = new SCAWaiter(this.config, this.scanId, this.httpClient, this.stopwatch, this.log);
         await waiter.waitForScanToFinish();
         const scaResults: SCAResults = await this.retrieveScanResults();
         const scaReportResults: ScaReportResults = new ScaReportResults(scaResults, this.config);

@@ -17,6 +17,7 @@ export class SastClient {
     private readonly stopwatch = new Stopwatch();
 
     private scanId: number = 0;
+    public scanStatus: string = '';
 
     constructor(private readonly config: SastConfig,
         private readonly httpClient: HttpClient,
@@ -94,6 +95,7 @@ export class SastClient {
                 this.logWaitingProgress,
                 polling);
         } catch (e) {
+            this.scanStatus = ScanStage.Failed;
             throw Error(`Waiting for CxSAST scan has reached the time limit (${polling.masterTimeoutMinutes} minutes).`);
         }
 
@@ -122,14 +124,14 @@ export class SastClient {
                     this.log.debug(`Resolved post scan action ID: ${foundCustomTask.id}`);
                     return foundCustomTask.id;
                 } else {
-                    this.log.error(`Could not resolve post scan action ID from name: ${postScanActionName}`);
+                    throw Error(`Could not resolve post scan action ID from name: ${postScanActionName}`);
                 }
             }
         } catch (e) {
             if (e.status == 404) {
                 this.log.error('Post Scan Action name API is not supported.');
             }else{
-                this.log.error(`Could not resolve post scan action ID from name: ${postScanActionName}`);
+                throw Error(`Could not resolve post scan action ID from name: ${postScanActionName}`);
             }
         }
         
@@ -172,11 +174,26 @@ export class SastClient {
         return new Promise<ScanStatus>((resolve, reject) => {
             this.httpClient.getRequest(`sast/scansQueue/${this.scanId}`)
                 .then((scanStatus: ScanStatus) => {
+                    if (this.scanStatus != ScanStage.Failed) {
                     if (SastClient.isInProgress(scanStatus)) {
                         reject(scanStatus);
                     } else {
                         resolve(scanStatus);
                     }
+                }
+                else {
+                    const request = {                    
+                        status: ScanStage.Canceled                        
+                    };
+                    try {                    
+                    this.log.debug('Updating scan settings.');
+                    this.httpClient.patchRequest(`sast/scansQueue/${this.scanId}`, request);
+                    this.log.debug("SAST scan canceled. (scanId: " + this.scanId + ")");
+                }
+                catch(ex) {
+                    this.log.error("SAST scan can't canceled. (scanId: " + this.scanId + "): " + ex);
+                }
+                }
                 }).catch(err => {
                     const scanStatus: ScanStatus = {
                         stage: { value : ScanStage.Failed },
@@ -214,5 +231,10 @@ export class SastClient {
                 scanStatus.stageDetails !== SastClient.SCAN_COMPLETED_MESSAGE;
         }
         return result;
+    }
+
+    private patchScanSettings(request: ScanStatus) {
+        this.log.info('Updating scan settings.');
+        return this.httpClient.patchRequest(`sast/scansQueue/${this.scanId}`, request);
     }
 }
