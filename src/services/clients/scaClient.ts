@@ -234,16 +234,31 @@ export class ScaClient {
         if (!Boolean(this.config.includeSource)) {
             this.log.info("Using manifest and fingerprint flow.");
             const projectResolvingConfiguration = await this.fetchProjectResolvingConfiguration();
-            const manifestsIncludeFilter = new FilePathFilter(projectResolvingConfiguration.getManifestsIncludePattern(), '')
+            let manifestInclude = projectResolvingConfiguration.getManifestsIncludePattern();
+            if (this.config.manifestPattern) {
+                let manifestUI = (this.config.manifestPattern).replace(/\s/g, "");
+                if (manifestInclude)
+                    manifestInclude = manifestInclude.concat(',', manifestUI);
+                else
+                    manifestInclude = manifestUI;
+            }
+            const manifestsIncludeFilter = new FilePathFilter(manifestInclude, '');
 
             if (!manifestsIncludeFilter.hasInclude())
                 throw Error(`Using manifest only mode requires include filter. Resolving config does not have include patterns defined: ${projectResolvingConfiguration.getManifestsIncludePattern()}`)
 
             filePathFiltersOr.push(manifestsIncludeFilter);
+            let fingerprintInclude = projectResolvingConfiguration.getFingerprintsIncludePattern();
+            if (this.config.fingerprintPattern) {
+                let fingerprintUI = (this.config.fingerprintPattern).replace(/\s/g, "");
+                if (fingerprintInclude)
+                    fingerprintInclude = fingerprintInclude.concat(',', fingerprintUI);
+                else
+                    fingerprintInclude = fingerprintUI;
+            }
+            fingerprintsFilePath = await this.createScanFingerprintsFile([...filePathFiltersAnd, new FilePathFilter(fingerprintInclude, '')]);
 
-            fingerprintsFilePath = await this.createScanFingerprintsFile([...filePathFiltersAnd, new FilePathFilter(projectResolvingConfiguration.getFingerprintsIncludePattern(), '')]);
-
-            if (fingerprintsFilePath) {
+            if (fingerprintsFilePath) { 
                 filePathFiltersOr.push(new FilePathFilter(ScaClient.FINGERPRINT_FILE_NAME, ''));
             }
         } else if (this.config.fingerprintsFilePath) {
@@ -460,6 +475,10 @@ export class ScaClient {
 
     private async sendStartScanRequest(sourceLocation: SourceLocationType, sourceUrl: string): Promise<any> {
         this.log.info("Sending a request to start scan.");
+        await this.updateProjectCustomTags();
+        let scanCustomTagObj = {};
+        if (this.config.scanCustomTags) 
+            scanCustomTagObj = this.normalizeTags(this.config.scanCustomTags);
         const request = {
             project: {
                 id: this.projectId,
@@ -479,7 +498,8 @@ export class ScaClient {
                     "environmentVariables": JSON.stringify(Array.from(this.config.envVariables)),
                 }
             }
-            ]
+            ],
+            tags: scanCustomTagObj
         };
         return await this.httpClient.postRequest(ScaClient.CREATE_SCAN, request);
     }
@@ -507,7 +527,7 @@ The Build Failed for the Following Reasons:
 
     public async waitForScanResults(result: ScanResults) {
         this.log.info("------------------------------------ Get CxSCA Results -----------------------------------");
-        const waiter: SCAWaiter = new SCAWaiter(this.scanId, this.httpClient, this.stopwatch, this.log);
+        const waiter: SCAWaiter = new SCAWaiter(this.config, this.scanId, this.httpClient, this.stopwatch, this.log);
         await waiter.waitForScanToFinish();
         const scaResults: SCAResults = await this.retrieveScanResults();
         const scaReportResults: ScaReportResults = new ScaReportResults(scaResults, this.config);
@@ -793,4 +813,48 @@ The Build Failed for the Following Reasons:
         }
         return scaResolverResultPathArgName;
     }
+
+    private normalizeTags(input: string | undefined) {
+        let tags = input || '';
+        tags = tags.replace(/\s/g, "");
+        let tagArray = tags.split(',');
+        let tagObj: { [k: string]: string } = {};
+        for (let tag of tagArray) {
+            this.log.debug("Custom Tags: ");
+            let tempArr = tag.split(':');
+            if (tempArr.length == 2) {
+                if (tempArr[0].length > 250 || tempArr[1].length > 250)
+                    this.log.warning("Either key or value has character length more than 250. Ignoring the provided input tag: " + tag + ".");
+                else {
+                    tagObj[tempArr[0]] = tempArr[1];
+                    this.log.debug("Key: " + tempArr[0] + ", Value: " + tempArr[1]);
+                }
+            }
+            else
+                this.log.warning("Provided Input tag: " + tag + " has incorrect syntax, Ignoring it.");
+        }
+        return tagObj;
+    }
+
+    private async updateProjectCustomTags(): Promise<void> {
+        this.log.debug("Updating Project Custom Tags");
+        let projectCustomTagObj = {};
+        try {
+            if (this.config.projectCustomTags) 
+                projectCustomTagObj = this.normalizeTags(this.config.projectCustomTags);
+            let projectId = this.projectId;
+            let path = ScaClient.PROJECTS + `/${projectId}`;
+            const teamName = this.config.scaSastTeam;
+            let teamNameArray: Array<string | undefined> = [teamName];
+            const request = {
+                name: this.scanConfig.projectName,
+                AssignedTeams: teamNameArray,
+                tags: projectCustomTagObj
+            };
+            await this.httpClient.putRequest(path, request);
+        } catch (err) {
+            this.log.error("Error occurred while updating project tags: " + err.message);
+        }
+    }
+
 }
