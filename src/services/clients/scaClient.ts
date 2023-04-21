@@ -235,6 +235,7 @@ export class ScaClient {
             this.log.info("Using manifest and fingerprint flow.");
             const projectResolvingConfiguration = await this.fetchProjectResolvingConfiguration();
             let manifestInclude = projectResolvingConfiguration.getManifestsIncludePattern();
+            this.log.debug("Default Manifest Pattern: "+manifestInclude);
             if (this.config.manifestPattern) {
                 let manifestUI = (this.config.manifestPattern).replace(/\s/g, "");
                 if (manifestInclude)
@@ -249,6 +250,7 @@ export class ScaClient {
 
             filePathFiltersOr.push(manifestsIncludeFilter);
             let fingerprintInclude = projectResolvingConfiguration.getFingerprintsIncludePattern();
+            this.log.debug("Default Fingerprint Patterns: "+fingerprintInclude);
             if (this.config.fingerprintPattern) {
                 let fingerprintUI = (this.config.fingerprintPattern).replace(/\s/g, "");
                 if (fingerprintInclude)
