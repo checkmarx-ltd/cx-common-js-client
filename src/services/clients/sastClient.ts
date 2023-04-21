@@ -124,14 +124,14 @@ export class SastClient {
                     this.log.debug(`Resolved post scan action ID: ${foundCustomTask.id}`);
                     return foundCustomTask.id;
                 } else {
-                    throw Error(`Could not resolve post scan action ID from name: ${postScanActionName}`);
+                    this.log.warning(`Could not resolve post scan action ID from name: ${postScanActionName}`);
                 }
             }
         } catch (e) {
             if (e.status == 404) {
-                this.log.error('Post Scan Action name API is not supported.');
+                this.log.warning('Post Scan Action name API is not supported.');
             }else{
-                throw Error(`Could not resolve post scan action ID from name: ${postScanActionName}`);
+                this.log.warning(`Could not resolve post scan action ID from name: ${postScanActionName}`);
             }
         }
         
