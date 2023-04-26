@@ -1,6 +1,6 @@
 {
   "name": "@checkmarx/cx-common-js-client",
-  "version": "0.1.81",
+  "version": "0.1.82",
   "description": "Client for interaction with Checkmarx products.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -42,7 +42,7 @@
     "mkdirp": "^0.5.4",
     "parse-ms": "^2.1.0",
     "promise-poller": "^1.9.1",
-    "proxy-agent": "^4.0.0",
+    "proxy-agent": "^4.0.1",
     "superagent": "^5.1.0",
     "superagent-proxy": "^2.1.0",
     "tmp": "^0.1.0",
