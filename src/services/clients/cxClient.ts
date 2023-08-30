@@ -234,7 +234,7 @@ export class CxClient {
         let existingCustomFields = await this.getCustomFieldsProjectName();
         for(let i=0; i < existingCustomFields.length; i++)
         {
-            var isIdExists = projectCustomFieldsIds.find(a=> a == existingCustomFields[i].id.toString()) != undefined;
+            let isIdExists = projectCustomFieldsIds.find(a=> a == existingCustomFields[i].id.toString()) != undefined;
             if(!isIdExists)
             {
                 customField = {"id":parseInt(existingCustomFields[i].id.toString()),"value":existingCustomFields[i].value};
