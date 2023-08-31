@@ -339,7 +339,7 @@ export class CxClient {
         const path = `projects?projectname=${encodedName}&teamid=${this.teamId}`;
         try {
             const projects = await this.httpClient.getRequest(path, { suppressWarnings: true });
-            if (projects && projects?.length) 
+            if (projects && projects.length) 
                 result = projects[0].customFields;
         } catch (err) {
             const isExpectedError = err.response && err.response.notFound;
