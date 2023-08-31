@@ -469,8 +469,10 @@ export class ScaClient {
         if (this.scanConfig.enableProxy && this.proxyConfig && this.proxyConfig.proxyUrl) {
             let proxyUrl = this.proxyConfig.proxyUrl;
             command = `curl -x ${proxyUrl} -X PUT -L "${uploadUrl}" -H "Content-Type:" -T "${file}" --ssl-no-revoke`;
+            this.log.debug('command: '+command);
         } else {
             command = `curl -X PUT -L "${uploadUrl}" -H "Content-Type:" -T "${file}" --ssl-no-revoke`;
+            this.log.debug('command: '+command);
         }
         child_process.execSync(command, { stdio: 'pipe' });
     }

@@ -20,6 +20,7 @@ import { SastConfig } from '../../dto/sastConfig';
 import { ScaConfig } from '../../dto/sca/scaConfig';
 import { ScanWithSettingsResponse } from "../../dto/api/scanWithSettingsResponse";
 import { NewVulnerabilitiesThresholdError } from "../../dto/newVulnerabilitiesThresholdError";
+import { CustomFields } from "../../dto/api/customFields";
 const fs = require('fs');
 
 /**
@@ -226,8 +227,22 @@ export class CxClient {
                 }
             }
         }     
+
         let customField = {};
-        let temp_customFields = []
+        let temp_customFields = [];
+
+        let existingCustomFields = await this.getCustomFieldsProjectName();
+        for(let i=0; i < existingCustomFields.length; i++)
+        {
+            let isIdExists = projectCustomFieldsIds.find(a=> a == existingCustomFields[i].id.toString()) != undefined;
+            if(!isIdExists)
+            {
+                customField = {"id":parseInt(existingCustomFields[i].id.toString()),"value":existingCustomFields[i].value};
+                temp_customFields.push(customField);
+            }
+        }
+
+        customField = {};
         for (let i=0; i < projectCustomFieldsIds.length; i++ ) {
             if( isNaN( parseInt(projectCustomFieldsIds[i]) ) ){
                 this.log.warning(`Could not update '${projectCustomFieldsKeys[i]}'. Custom Field does not exist.`);
@@ -237,7 +252,7 @@ export class CxClient {
                 temp_customFields.push(customField);
             }
         }
-                
+              
         await this.httpClient.putRequest(path, {
             name: this.config.projectName,
             owningTeam: this.teamId,
@@ -317,6 +332,24 @@ export class CxClient {
 
         return projectId;
     }
+
+    private async getCustomFieldsProjectName(): Promise<Array<CustomFields>> {
+        let result;
+        const encodedName = encodeURIComponent(this.config.projectName);
+        const path = `projects?projectname=${encodedName}&teamid=${this.teamId}`;
+        try {
+            const projects = await this.httpClient.getRequest(path, { suppressWarnings: true });
+            if (projects && projects.length) 
+                result = projects[0].customFields;
+        } catch (err) {
+            const isExpectedError = err.response && err.response.notFound;
+            if (!isExpectedError) {
+                throw err;
+            }
+        }
+        return result;
+    }
+
     private async isScanLevelCustomFieldSupported(): Promise<boolean> {
         try {
             let versionInfo =await this.getVersionInfo();
