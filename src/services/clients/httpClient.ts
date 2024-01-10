@@ -55,7 +55,7 @@ export class HttpClient {
     private loginType:string = '';
     private certificate : string | any;
 
-    constructor(private readonly baseUrl: string, private readonly origin: string, private readonly originUrl : string, private readonly log: Logger, private proxyConfig?: ProxyConfig, private certFilePath? : string ) {
+    constructor(private readonly baseUrl: string, private readonly origin: string, private readonly originUrl : string, private readonly log: Logger, private proxyConfig?: ProxyConfig, private certFilePath? : string, private version? : string ) {
 
         if(this.certFilePath)
         {
@@ -334,26 +334,27 @@ export class HttpClient {
     }
 
     getRequest(relativePath: string, options?: RequestOptions): Promise<any> {
-        const internalOptions: InternalRequestOptions = { retry: true, method: 'get', blob: false, customHeaders:{}  };
+        const internalOptions: InternalRequestOptions = { retry: true, method: 'get', blob: false,  customHeaders:this.getUserAgentHeader()  };
         return this.sendRequest(relativePath, Object.assign(internalOptions, options));
     }
 	
 	patchRequest(relativePath: string, data: object): Promise<any> {
-        return this.sendRequest(relativePath, { singlePostData: data, retry: true, method: 'patch', blob: false, customHeaders:{} });
+        return this.sendRequest(relativePath, { singlePostData: data, retry: true, method: 'patch', blob: false, customHeaders:this.getUserAgentHeader() });
     }
 	
     postRequest(relativePath: string, data: object): Promise<any> {
-        return this.sendRequest(relativePath, { singlePostData: data, retry: true, method: 'post', blob: false, customHeaders:{}  });
+        return this.sendRequest(relativePath, { singlePostData: data, retry: true, method: 'post', blob: false, customHeaders:this.getUserAgentHeader()  });
     }
 
     putRequest(relativePath: string, data: object): Promise<any> {
-        return this.sendRequest(relativePath, { singlePostData: data, retry: true, method: 'put', blob: false, customHeaders:{}  });
+        return this.sendRequest(relativePath, { singlePostData: data, retry: true, method: 'put', blob: false, customHeaders:this.getUserAgentHeader()  });
     }
 
     postMultipartRequest(relativePath: string,
         fields: { [fieldName: string]: any },
         attachments: { [fieldName: string]: string } ,
         additionalHeaders: {}) {
+        const customHeaders = { customHeaders:this.getUserAgentHeader()  };
         return this.sendRequest(relativePath, {
             method: 'post',
             multipartPostData: {
@@ -362,9 +363,18 @@ export class HttpClient {
             },
             retry: true,
             blob: false,
-            customHeaders: additionalHeaders
+            customHeaders: Object.assign(additionalHeaders, customHeaders)
         });
     }
+
+    private getUserAgentHeader(): {} | undefined {
+        try {
+            return this.origin && this.version ? { 'User-Agent': 'plugin_name=' + this.origin + ';plugin_version=' +  this.version } : {};
+        } catch (error) {
+          console.error('Error reading package.json:', error);
+          return undefined;
+        }
+      }
 
     private isObject(obj:object) { return Object(obj) === obj; }
 
