@@ -196,6 +196,10 @@ export class HttpClient {
         if(this.certificate){
             newRequest.ca(this.certificate);
         }
+        if(this.origin && this.version)
+        {
+            newRequest.set({ 'User-Agent':  this.getUserAgentValue() });
+        }
        return newRequest.send({
             grant_type: APIConstants.AUTHORIZATION_CODE,
             client_id: authSSODetails.clientId,
@@ -262,6 +266,10 @@ export class HttpClient {
         }
         if(this.certificate){
             newRequest.ca(this.certificate);
+        }
+        if(this.origin && this.version)
+        {
+            newRequest.set({ 'User-Agent':  this.getUserAgentValue() });
         }
        return newRequest.send({
             grant_type: APIConstants.REFRESH_TOKEN,
@@ -367,13 +375,12 @@ export class HttpClient {
         });
     }
 
+    private getUserAgentValue() : string | undefined {
+        return 'plugin_name=' + this.origin + ';plugin_version=' +  this.version;
+
+    }
     private getUserAgentHeader(): {} | undefined {
-        try {
-            return this.origin && this.version ? { 'User-Agent': 'plugin_name=' + this.origin + ';plugin_version=' +  this.version } : {};
-        } catch (error) {
-          console.error('Error reading package.json:', error);
-          return undefined;
-        }
+        return this.origin && this.version ? { 'User-Agent': this.getUserAgentValue() } : {};
       }
 
     private isObject(obj:object) { return Object(obj) === obj; }
@@ -506,6 +513,10 @@ export class HttpClient {
         if(this.certificate){
             newRequest.ca(this.certificate);
         }
+        if(this.origin && this.version)
+        {
+            newRequest.set({ 'User-Agent':  this.getUserAgentValue()});
+        }
         return newRequest.send({
             userName: this.username,
             password: this.password,
@@ -546,6 +557,10 @@ export class HttpClient {
         }
         if(this.certificate){
             newRequest.ca(this.certificate);
+        }
+        if(this.origin && this.version)
+        {
+            newRequest.set({ 'User-Agent':  this.getUserAgentValue() });
         }
         // Pass tenant name in a custom header. This will allow to get token from on-premise access control server
         // and then use this token for SCA authentication in cloud.
