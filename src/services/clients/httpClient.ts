@@ -186,7 +186,9 @@ export class HttpClient {
 	
     getPermissions(userInfo : Array<string>) : Permissions {
         return new Permissions(userInfo.includes(APIConstants.SAVE_SAST_SCAN.toString()),userInfo.includes(APIConstants.MANAGE_RESULTS_COMMENT.toString())
-                ,userInfo.includes(APIConstants.MANAGE_RESULTS_NOT_EXPLOITABLE.toString()));
+                ,userInfo.includes(APIConstants.MANAGE_RESULTS_NOT_EXPLOITABLE.toString()),userInfo.includes(APIConstants.MANAGE_RESULTS_TOVERIFY.toString())
+                ,userInfo.includes(APIConstants.MANAGE_RESULTS_CONFIRMED.toString()),userInfo.includes(APIConstants.MANAGE_RESULTS_URGENT.toString())
+                ,userInfo.includes(APIConstants.MANAGE_RESULTS_PROPOSED_NOT_EXPLOITABLE.toString()),userInfo.includes(APIConstants.MANAGE_RESULTS_ACCEPTED.toString()));
     }
 
     /**
