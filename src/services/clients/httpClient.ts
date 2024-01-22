@@ -11,6 +11,7 @@ import { AuthSSODetails } from "../../dto/authSSODetails";
 import { APIConstants } from "../../dto/apiConstant";
 import fs = require('fs');
 import pac = require('pac-resolver');
+import { Permissions } from '../../dto/permissions';
 
 
 interface InternalRequestOptions extends RequestOptions {
@@ -167,6 +168,25 @@ export class HttpClient {
         authCodeURL += "&"+APIConstants.RESPONSE_TYPE+"=" + APIConstants.responseType;
         authCodeURL += "&"+APIConstants.REDIRECT_URI+"=" + authSSODetails.redirectURI;
         return authCodeURL;
+    }
+
+    /**
+     * This method gets permission details according to user
+     * @param accessToken accessToken 
+     * @returns 
+     */
+     
+
+    async getPermissionsFromUserInfo() : Promise<Permissions>{
+        var authHeader = {'Content-Length':'0','Authorization' :APIConstants.BEARER + this.accessToken};
+        const fullUrl = url.resolve(this.baseUrl, APIConstants.userInfoEP);
+        const response = await this.postRequestWithAuthHeader(fullUrl, request,authHeader);
+        return this.getPermissions(response['sast-permissions']);
+    }
+	
+    getPermissions(userInfo : Array<string>) : Permissions {
+        return new Permissions(userInfo.includes(APIConstants.SAVE_SAST_SCAN.toString()),userInfo.includes(APIConstants.MANAGE_RESULTS_COMMENT.toString())
+                ,userInfo.includes(APIConstants.MANAGE_RESULTS_NOT_EXPLOITABLE.toString()));
     }
 
     /**
@@ -356,6 +376,11 @@ export class HttpClient {
 
     putRequest(relativePath: string, data: object): Promise<any> {
         return this.sendRequest(relativePath, { singlePostData: data, retry: true, method: 'put', blob: false, customHeaders:this.getUserAgentHeader()  });
+    }
+
+    postRequestWithAuthHeader(relativePath: string, data: object,additionalHeaders: {}): Promise<any> {
+        const customHeaders = { customHeaders:this.getUserAgentHeader()  };
+        return this.sendRequest(relativePath, { singlePostData: data, retry: true, method: 'post', blob: false, customHeaders:Object.assign(additionalHeaders, customHeaders)  });
     }
 
     postMultipartRequest(relativePath: string,
