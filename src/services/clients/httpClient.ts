@@ -55,6 +55,7 @@ export class HttpClient {
     isSsoLogin: boolean = false;
     private loginType:string = '';
     private certificate : string | any;
+    public readonly SAST_PERMISSION:string  = 'sast-permissions';
 
     constructor(private readonly baseUrl: string, private readonly origin: string, private readonly originUrl : string, private readonly log: Logger, private proxyConfig?: ProxyConfig, private certFilePath? : string, private version? : string ) {
 
@@ -179,7 +180,7 @@ export class HttpClient {
         var authHeader = {'Content-Length':'0','Authorization' :APIConstants.BEARER + this.accessToken};
         const fullUrl = url.resolve(this.baseUrl, APIConstants.userInfoEP);
         const response = await this.postRequestWithAuthHeader(fullUrl, request,authHeader);
-        this.permissions = response['sast-permissions'];
+        this.permissions = response[this.SAST_PERMISSION];
     }
 
 
@@ -197,7 +198,7 @@ export class HttpClient {
      */
     async getPermissionDetailsUsingJwtDecode() {
         const tokenInfo : JwtPayload | any = await this.getDecodedAccessToken(); 
-        this.permissions = tokenInfo['sast-permissions'];
+        this.permissions = tokenInfo[this.SAST_PERMISSION];
     }
 
     /**
