@@ -16,12 +16,4 @@ export class APIConstants  {
     public static readonly AUTHORIZATION_CODE:string  = 'authorization_code';
     public static readonly REFRESH_TOKEN:string  = 'refresh_token';
     public static readonly BEARER:string  = 'BEARER';
-    public static readonly SAVE_SAST_SCAN:String = "save-sast-scan";
-    public static readonly MANAGE_RESULTS_COMMENT:String = "manage-result-comment";
-    public static readonly MANAGE_RESULTS_TOVERIFY:String = "set-result-state-toverify";
-    public static readonly MANAGE_RESULTS_CONFIRMED:String = "set-result-state-confirmed";
-    public static readonly MANAGE_RESULTS_URGENT:String = "set-result-state-urgent";
-    public static readonly MANAGE_RESULTS_PROPOSED_NOT_EXPLOITABLE:String = "set-result-state-proposednotexploitable";
-    public static readonly MANAGE_RESULTS_ACCEPTED:String = "set-result-state-accepted";
-    public static readonly MANAGE_RESULTS_NOT_EXPLOITABLE:String = "set-result-state-notexploitable";
 }

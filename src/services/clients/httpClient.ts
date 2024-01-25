@@ -11,8 +11,7 @@ import { AuthSSODetails } from "../../dto/authSSODetails";
 import { APIConstants } from "../../dto/apiConstant";
 import fs = require('fs');
 import pac = require('pac-resolver');
-import { Permissions } from '../../dto/permissions';
-
+import {jwtDecode, JwtPayload } from 'jwt-decode';
 
 interface InternalRequestOptions extends RequestOptions {
     method: 'put' | 'post' | 'get' | 'patch';
@@ -48,6 +47,7 @@ export class HttpClient {
     accessToken: string = '';
     refreshToken: string = '';
     tokenExpTime: number = 0;
+    permissions : Array<string> | any;
 
     private proxyResult = '';
     private proxyContent = '';
@@ -171,24 +171,41 @@ export class HttpClient {
     }
 
     /**
-     * This method gets permission details according to user
-     * @param accessToken accessToken 
+     * This method gets all user permission details
      * @returns 
      */
-     
 
-    async getPermissionsFromUserInfo() : Promise<Permissions>{
+    async getPermissionsFromUserInfo(){
         var authHeader = {'Content-Length':'0','Authorization' :APIConstants.BEARER + this.accessToken};
         const fullUrl = url.resolve(this.baseUrl, APIConstants.userInfoEP);
         const response = await this.postRequestWithAuthHeader(fullUrl, request,authHeader);
-        return this.getPermissions(response['sast-permissions']);
+        this.permissions = response['sast-permissions'];
     }
-	
-    getPermissions(userInfo : Array<string>) : Permissions {
-        return new Permissions(userInfo.includes(APIConstants.SAVE_SAST_SCAN.toString()),userInfo.includes(APIConstants.MANAGE_RESULTS_COMMENT.toString())
-                ,userInfo.includes(APIConstants.MANAGE_RESULTS_NOT_EXPLOITABLE.toString()),userInfo.includes(APIConstants.MANAGE_RESULTS_TOVERIFY.toString())
-                ,userInfo.includes(APIConstants.MANAGE_RESULTS_CONFIRMED.toString()),userInfo.includes(APIConstants.MANAGE_RESULTS_URGENT.toString())
-                ,userInfo.includes(APIConstants.MANAGE_RESULTS_PROPOSED_NOT_EXPLOITABLE.toString()),userInfo.includes(APIConstants.MANAGE_RESULTS_ACCEPTED.toString()));
+
+
+    /**
+     * This method decodes access token using jwt decode
+     * @returns 
+     */
+    async getDecodedAccessToken() {
+        return jwtDecode(this.accessToken);
+    }
+
+    /**
+     * This method gets all user permission details using jwt-decode
+     * @returns 
+     */
+    async getPermissionDetailsUsingJwtDecode() {
+        const tokenInfo : JwtPayload | any = await this.getDecodedAccessToken(); 
+        this.permissions = tokenInfo['sast-permissions'];
+    }
+
+    /**
+     * This method validates user have permission or not
+     * @returns 
+     */
+    async validateUserPermission(permissionName : string){
+        return this.permissions.includes(permissionName);
     }
 
     /**
