@@ -15,4 +15,5 @@ export interface ScanConfig {
     sastConfig?: SastConfig;
     scaConfig?: ScaConfig;
     proxyConfig?: ProxyConfig;
+    version?: string;
 }

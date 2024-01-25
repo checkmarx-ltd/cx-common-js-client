@@ -1,6 +1,6 @@
 {
   "name": "@checkmarx/cx-common-js-client",
-  "version": "0.1.83",
+  "version": "0.1.84",
   "description": "Client for interaction with Checkmarx products.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -38,22 +38,23 @@
   "dependencies": {
     "archiver": "^3.0.0",
     "dateformat": "^3.0.3",
+    "debug": "^4.3.2",
+    "glob-parent": "^5.1.2",
+    "jwt-decode": "^4.0.0",
+    "lodash": "^4.17.21",
     "micromatch": "^3.1.0",
     "mkdirp": "^0.5.4",
     "parse-ms": "^2.1.0",
     "promise-poller": "^1.9.1",
     "proxy-agent": "^4.0.1",
+    "snapdragon": "^0.12.1",
     "superagent": "^5.1.0",
     "superagent-proxy": "^2.1.0",
     "tmp": "^0.1.0",
     "upath": "^1.2.0",
     "walk": "^2.3.14",
     "xml2js": "^0.4.22",
-    "debug": "^4.3.2",
-    "lodash": "^4.17.21",
-    "glob-parent": "^5.1.2",
-    "y18n": "^4.0.1",
-    "snapdragon": "^0.12.1"
+    "y18n": "^4.0.1"
   },
   "devDependencies": {
     "@types/archiver": "^2.1.3",

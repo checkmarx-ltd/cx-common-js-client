@@ -11,7 +11,7 @@ import { AuthSSODetails } from "../../dto/authSSODetails";
 import { APIConstants } from "../../dto/apiConstant";
 import fs = require('fs');
 import pac = require('pac-resolver');
-
+import {jwtDecode, JwtPayload } from 'jwt-decode';
 
 interface InternalRequestOptions extends RequestOptions {
     method: 'put' | 'post' | 'get' | 'patch';
@@ -47,6 +47,7 @@ export class HttpClient {
     accessToken: string = '';
     refreshToken: string = '';
     tokenExpTime: number = 0;
+    permissions : Array<string> | any;
 
     private proxyResult = '';
     private proxyContent = '';
@@ -54,8 +55,9 @@ export class HttpClient {
     isSsoLogin: boolean = false;
     private loginType:string = '';
     private certificate : string | any;
+    public readonly SAST_PERMISSION:string  = 'sast-permissions';
 
-    constructor(private readonly baseUrl: string, private readonly origin: string, private readonly originUrl : string, private readonly log: Logger, private proxyConfig?: ProxyConfig, private certFilePath? : string ) {
+    constructor(private readonly baseUrl: string, private readonly origin: string, private readonly originUrl : string, private readonly log: Logger, private proxyConfig?: ProxyConfig, private certFilePath? : string, private version? : string ) {
 
         if(this.certFilePath)
         {
@@ -170,6 +172,44 @@ export class HttpClient {
     }
 
     /**
+     * This method gets all user permission details
+     * @returns 
+     */
+
+    async getPermissionsFromUserInfo(){
+        var authHeader = {'Content-Length':'0','Authorization' :APIConstants.BEARER + this.accessToken};
+        const fullUrl = url.resolve(this.baseUrl, APIConstants.userInfoEP);
+        const response = await this.postRequestWithAuthHeader(fullUrl, request,authHeader);
+        this.permissions = response[this.SAST_PERMISSION];
+    }
+
+
+    /**
+     * This method decodes access token using jwt decode
+     * @returns 
+     */
+    async getDecodedAccessToken() {
+        return jwtDecode(this.accessToken);
+    }
+
+    /**
+     * This method gets all user permission details using jwt-decode
+     * @returns 
+     */
+    async getPermissionDetailsUsingJwtDecode() {
+        const tokenInfo : JwtPayload | any = await this.getDecodedAccessToken(); 
+        this.permissions = tokenInfo[this.SAST_PERMISSION];
+    }
+
+    /**
+     * This method validates user have permission or not
+     * @returns 
+     */
+    async validateUserPermission(permissionName : string){
+        return this.permissions.includes(permissionName);
+    }
+
+    /**
      * This methos executed single sign on using authorization code
      * @param authSSODetails AuthSSODetails object contains details about SSO login
      * and populates access token, refresh token and token expiration time
@@ -195,6 +235,10 @@ export class HttpClient {
         }
         if(this.certificate){
             newRequest.ca(this.certificate);
+        }
+        if(this.origin && this.version)
+        {
+            newRequest.set({ 'User-Agent':  this.getUserAgentValue() });
         }
        return newRequest.send({
             grant_type: APIConstants.AUTHORIZATION_CODE,
@@ -262,6 +306,10 @@ export class HttpClient {
         }
         if(this.certificate){
             newRequest.ca(this.certificate);
+        }
+        if(this.origin && this.version)
+        {
+            newRequest.set({ 'User-Agent':  this.getUserAgentValue() });
         }
        return newRequest.send({
             grant_type: APIConstants.REFRESH_TOKEN,
@@ -334,26 +382,32 @@ export class HttpClient {
     }
 
     getRequest(relativePath: string, options?: RequestOptions): Promise<any> {
-        const internalOptions: InternalRequestOptions = { retry: true, method: 'get', blob: false, customHeaders:{}  };
+        const internalOptions: InternalRequestOptions = { retry: true, method: 'get', blob: false,  customHeaders:this.getUserAgentHeader()  };
         return this.sendRequest(relativePath, Object.assign(internalOptions, options));
     }
 	
 	patchRequest(relativePath: string, data: object): Promise<any> {
-        return this.sendRequest(relativePath, { singlePostData: data, retry: true, method: 'patch', blob: false, customHeaders:{} });
+        return this.sendRequest(relativePath, { singlePostData: data, retry: true, method: 'patch', blob: false, customHeaders:this.getUserAgentHeader() });
     }
 	
     postRequest(relativePath: string, data: object): Promise<any> {
-        return this.sendRequest(relativePath, { singlePostData: data, retry: true, method: 'post', blob: false, customHeaders:{}  });
+        return this.sendRequest(relativePath, { singlePostData: data, retry: true, method: 'post', blob: false, customHeaders:this.getUserAgentHeader()  });
     }
 
     putRequest(relativePath: string, data: object): Promise<any> {
-        return this.sendRequest(relativePath, { singlePostData: data, retry: true, method: 'put', blob: false, customHeaders:{}  });
+        return this.sendRequest(relativePath, { singlePostData: data, retry: true, method: 'put', blob: false, customHeaders:this.getUserAgentHeader()  });
+    }
+
+    postRequestWithAuthHeader(relativePath: string, data: object,additionalHeaders: {}): Promise<any> {
+        const customHeaders = { customHeaders:this.getUserAgentHeader()  };
+        return this.sendRequest(relativePath, { singlePostData: data, retry: true, method: 'post', blob: false, customHeaders:Object.assign(additionalHeaders, customHeaders)  });
     }
 
     postMultipartRequest(relativePath: string,
         fields: { [fieldName: string]: any },
         attachments: { [fieldName: string]: string } ,
         additionalHeaders: {}) {
+        const customHeaders = { customHeaders:this.getUserAgentHeader()  };
         return this.sendRequest(relativePath, {
             method: 'post',
             multipartPostData: {
@@ -362,9 +416,17 @@ export class HttpClient {
             },
             retry: true,
             blob: false,
-            customHeaders: additionalHeaders
+            customHeaders: Object.assign(additionalHeaders, customHeaders)
         });
     }
+
+    private getUserAgentValue() : string | undefined {
+        return 'plugin_name=' + this.origin + ';plugin_version=' +  this.version;
+
+    }
+    private getUserAgentHeader(): {} | undefined {
+        return this.origin && this.version ? { 'User-Agent': this.getUserAgentValue() } : {};
+      }
 
     private isObject(obj:object) { return Object(obj) === obj; }
 
@@ -496,6 +558,10 @@ export class HttpClient {
         if(this.certificate){
             newRequest.ca(this.certificate);
         }
+        if(this.origin && this.version)
+        {
+            newRequest.set({ 'User-Agent':  this.getUserAgentValue()});
+        }
         return newRequest.send({
             userName: this.username,
             password: this.password,
@@ -536,6 +602,10 @@ export class HttpClient {
         }
         if(this.certificate){
             newRequest.ca(this.certificate);
+        }
+        if(this.origin && this.version)
+        {
+            newRequest.set({ 'User-Agent':  this.getUserAgentValue() });
         }
         // Pass tenant name in a custom header. This will allow to get token from on-premise access control server
         // and then use this token for SCA authentication in cloud.
