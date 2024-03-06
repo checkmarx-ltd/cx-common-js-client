@@ -152,13 +152,10 @@ export class SastClient {
            {
                 if (SastClient.isInProgress(scanStatus)) {
                     return true;
-                } else {
-                    return false;
                 }
             }
-        }else{
-            return false;
         }
+        return false;
      }
  
     private static throwScanError(status: ScanStatus) {
