@@ -367,7 +367,7 @@ export class CxClient {
         let isOverrideProjectSettings = false;
         var apiVersionHeader = {};
         if (await this.isScanLevelCustomFieldSupported()) {
-            apiVersionHeader = { 'Content-type': 'application/json;v=1.2' };
+            apiVersionHeader = { 'Content-type': 'application/json;v=1.2' , 'version' : '1.2'};
         }
         isOverrideProjectSettings = this.sastConfig.overrideProjectSettings || this.isNewProject;
         const scanResponse: ScanWithSettingsResponse = await this.httpClient.postMultipartRequest('sast/scanWithSettings',
