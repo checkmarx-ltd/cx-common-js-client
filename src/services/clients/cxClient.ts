@@ -319,18 +319,49 @@ export class CxClient {
             this.isNewProject = false;
         } else {
             this.log.info('Project not found, creating a new one.');
-            this.isNewProject = true;
-            if (this.sastConfig.denyProject) {
+            if (this.sastConfig.denyProject) 
                 throw Error(
                     `Creation of the new project [${this.config.projectName}] is not authorized. Please use an existing project.` +
                     " You can enable the creation of new projects by disabling the Deny new Checkmarx projects creation checkbox in the Checkmarx plugin global settings.");
+            
+            //Create newProject and checking if EnableSASTBranching is enabled then creating branch project 
+            if (this.sastConfig.enableSastBranching) 
+            {
+                if(!this.sastConfig.masterBranchProjectName)
+                    throw Error("Master branch project name is mandatory to create branched project.");
+                else
+                {
+                    let masterProjectId = await this.getProjectIdByProjectName(this.sastConfig.masterBranchProjectName);
+                    projectId = await this.createChildProject(masterProjectId,this.config.projectName);
+                    if(projectId == -1 )
+                        throw Error('Branched project could not be created: ' + this.config.projectName);
+                    else this.isNewProject = true;
+                }
             }
-
-            projectId = await this.createNewProject();
+            else 
+            {
+                projectId = await this.createNewProject();
+                this.isNewProject = true;
+            }
             this.log.debug(`Project created. ID: ${projectId}`);
         }
 
         return projectId;
+    }
+
+    private async createChildProject(projectId :number,childProjectName :string) : Promise<number>
+    {
+        const request = {
+            id: projectId,
+            project: {
+                name : childProjectName
+            }
+        };
+        const newProject = await this.httpClient.postRequest(`projects/${projectId}/branch`, request);
+        if (newProject != null || newProject)
+            return newProject.id;
+        else
+            throw Error(`CX Response for branch project request with name ${childProjectName} from existing project with ID ${projectId} was null`);
     }
 
     private async getCustomFieldsProjectName(): Promise<Array<CustomFields>> {
@@ -428,6 +459,28 @@ export class CxClient {
             const projects = await this.httpClient.getRequest(path, { suppressWarnings: true });
             if (projects && projects.length) {
                 result = projects[0].id;
+            }
+        } catch (err) {
+            const isExpectedError = err.response && err.response.notFound;
+            if (!isExpectedError) {
+                throw err;
+            }
+        }
+        return result;
+    }
+
+    private async getProjectIdByProjectName(projectName :string): Promise<number> {
+        let result = 0;
+        const encodedName = encodeURIComponent(projectName);
+        const path = `projects?projectname=${encodedName}&teamid=${this.teamId}`;
+        try {
+            const projects = await this.httpClient.getRequest(path, { suppressWarnings: true });
+            if (projects && projects.length) {
+                result = projects[0].id;
+            }
+            else 
+            {
+                throw Error('Master branch project does not exist: ' + projectName);
             }
         } catch (err) {
             const isExpectedError = err.response && err.response.notFound;

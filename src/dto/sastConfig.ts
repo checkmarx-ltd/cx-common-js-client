@@ -30,4 +30,6 @@ export interface SastConfig {
     postScanActionName: string;
     postScanActionId?: number;
     avoidDuplicateProjectScans:boolean;
+    enableSastBranching:boolean;
+    masterBranchProjectName: string;
 }
