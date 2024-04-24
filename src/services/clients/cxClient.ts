@@ -332,10 +332,16 @@ export class CxClient {
                 else
                 {
                     let masterProjectId = await this.getProjectIdByProjectName(this.sastConfig.masterBranchProjectName);
-                    projectId = await this.createChildProject(masterProjectId,this.config.projectName);
-                    if(projectId == -1 )
-                        throw Error('Branched project could not be created: ' + this.config.projectName);
-                    else this.isNewProject = true;
+
+                    if(masterProjectId)
+                    {
+                        projectId = await this.createChildProject(masterProjectId,this.config.projectName);
+                        if(projectId == -1 )
+                            throw Error('Branched project could not be created: ' + this.config.projectName);
+                        else this.isNewProject = true;
+                    }
+                    else
+                        throw Error('Master branch project does not exist: ' + this.sastConfig.masterBranchProjectName);   
                 }
             }
             else 
@@ -351,13 +357,10 @@ export class CxClient {
 
     private async createChildProject(projectId :number,childProjectName :string) : Promise<number>
     {
-        const request = {
-            id: projectId,
-            project: {
-                name : childProjectName
-            }
+        const project = {
+            name : childProjectName
         };
-        const newProject = await this.httpClient.postRequest(`projects/${projectId}/branch`, request);
+        const newProject = await this.httpClient.postRequest(`projects/${projectId}/branch`, project);
         if (newProject != null || newProject)
             return newProject.id;
         else
@@ -475,13 +478,10 @@ export class CxClient {
         const path = `projects?projectname=${encodedName}&teamid=${this.teamId}`;
         try {
             const projects = await this.httpClient.getRequest(path, { suppressWarnings: true });
-            if (projects && projects.length) {
+            if (projects && projects.length)
                 result = projects[0].id;
-            }
-            else 
-            {
+            else
                 throw Error('Master branch project does not exist: ' + projectName);
-            }
         } catch (err) {
             const isExpectedError = err.response && err.response.notFound;
             if (!isExpectedError) {
@@ -497,10 +497,7 @@ export class CxClient {
             owningTeam: this.teamId,
             isPublic: this.sastConfig.isPublic
         };
-
         const newProject = await this.httpClient.postRequest('projects', request);
-        this.log.debug(`Created new project, ID: ${newProject.id}`);
-
         return newProject.id;
     }
 
