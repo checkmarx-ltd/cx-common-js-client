@@ -15,6 +15,7 @@ export interface SastConfig {
     presetName: string;
     presetId?: number;
     scanTimeoutInMinutes?: number;
+    waitTimeForRetryScan?: number;
     enablePolicyViolations: boolean;
     generatePDFReport: boolean;
     vulnerabilityThreshold: boolean;

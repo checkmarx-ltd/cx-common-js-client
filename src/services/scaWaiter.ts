@@ -22,7 +22,7 @@ export class SCAWaiter {
 
         const polling: PollingSettings = {
             masterTimeoutMinutes: this.config.scaScanTimeoutInMinutes,
-            intervalSeconds: SCAWaiter.POLLING_INTERVAL_IN_SECONDS
+            intervalSeconds: this.config.scaWaitTimeForRetryScan != undefined && this.config.scaWaitTimeForRetryScan > 0 ? this.config.scaWaitTimeForRetryScan :  SCAWaiter.POLLING_INTERVAL_IN_SECONDS
         };
 
         let lastStatus;

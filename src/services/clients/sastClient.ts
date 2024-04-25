@@ -84,7 +84,7 @@ export class SastClient {
 
         const polling: PollingSettings = {
             masterTimeoutMinutes: this.config.scanTimeoutInMinutes,
-            intervalSeconds: SastClient.POLLING_INTERVAL_IN_SECONDS
+            intervalSeconds: ( this.config.waitTimeForRetryScan != undefined && this.config.waitTimeForRetryScan > 0 ? this.config.waitTimeForRetryScan : SastClient.POLLING_INTERVAL_IN_SECONDS)
         };
 
         let lastStatus;
