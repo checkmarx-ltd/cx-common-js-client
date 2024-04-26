@@ -87,6 +87,8 @@ export class SastClient {
             intervalSeconds: ( this.config.waitTimeForRetryScan != undefined && this.config.waitTimeForRetryScan > 0 ? this.config.waitTimeForRetryScan : SastClient.POLLING_INTERVAL_IN_SECONDS)
         };
 
+        this.log.debug('Waiting time before retry SAST scan is: ' + polling.intervalSeconds);
+
         let lastStatus;
         const waiter = new Waiter();
         try {
