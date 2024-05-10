@@ -557,6 +557,7 @@ export class CxClient {
 
     private async addStatisticsToScanResults(result: ScanResults) {
         const statistics = await this.sastClient.getScanStatistics(result.scanId);
+        result.criticalResults = statistics.crticalSeverity;
         result.highResults = statistics.highSeverity;
         result.mediumResults = statistics.mediumSeverity;
         result.lowResults = statistics.lowSeverity;
@@ -609,11 +610,13 @@ export class CxClient {
     }
 
     private printStatistics(result: ScanResults) {
+        const newCritical = (result.newCriticalCount > 0  && result.failBuildForNewVulnerabilitiesEnabled) ? " (" + result.newCriticalCount + " new)" : "";
         const newHigh = (result.newHighCount > 0  && result.failBuildForNewVulnerabilitiesEnabled) ? " (" + result.newHighCount + " new)" : "";
         const newMedium = (result.newMediumCount > 0 && result.failBuildForNewVulnerabilitiesEnabled) ? " (" + result.newMediumCount + " new)" : "";
         const newLow = (result.newLowCount > 0 && result.failBuildForNewVulnerabilitiesEnabled) ? " (" + result.newLowCount + " new)" : "";
         const newInfo = (result.newInfoCount > 0 && result.failBuildForNewVulnerabilitiesEnabled) ? " (" + result.newInfoCount + " new)" : "";
         this.log.info(`----------------------------Checkmarx Scan Results(CxSAST):-------------------------------
+Critical severity results: ${result.criticalResults}${newCritical}
 High severity results: ${result.highResults}${newHigh}
 Medium severity results: ${result.mediumResults}${newMedium}
 Low severity results: ${result.lowResults}${newLow}
@@ -649,6 +652,8 @@ Scan results location:  ${result.sastScanResultsLink}
                 if(result.$.FalsePositive === "False" && result.$.Status === "New"){
                     severity = result.$.Severity;
                     switch(severity){
+                        case "Critical":
+                            scanResult.newCriticalCount++;
                         case "High":
                             scanResult.newHighCount++;
                             break;
