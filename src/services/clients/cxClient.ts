@@ -57,6 +57,12 @@ export class CxClient {
         result.syncMode = this.config.isSyncMode;
 
         if (config.enableSastScan) {
+            if(!await this.isSASTSupportsCriticalSeverity() && (this.sastConfig.criticalThreshold > 0 || this.sastConfig.failBuildForNewVulnerabilitiesSeverity == 'CRITICAL'))
+            {
+                this.sastConfig.criticalThreshold = 0;
+                this.sastConfig.failBuildForNewVulnerabilitiesSeverity = '';
+                this.log.warning('Below SAST 9.7 version does not supports critical severity because of that ignoring critical threshold.');
+            }
             result.updateSastDefaultResults(this.sastConfig);
             this.log.info('Initializing Cx client');
             await this.initClients(httpClient);
@@ -274,6 +280,25 @@ export class CxClient {
         }
     }
 
+    private async isSASTSupportsCriticalSeverity(): Promise<boolean> {
+        try {
+            let versionInfo = await this.getVersionInfo();
+            let version = versionInfo.version;
+
+            const value = version.split(".");
+            var currentVersion = (value[0]) + "." + (value[1]);
+            if(parseFloat(currentVersion) >= parseFloat("9.7"))
+            {
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        } catch (e) {
+            return false;
+        }
+    }
     private async isScanWithSettingsSupported(): Promise<boolean> {
         try {
             let versionInfo = await this.getVersionInfo();
