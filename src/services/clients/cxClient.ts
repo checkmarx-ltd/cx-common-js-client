@@ -57,10 +57,13 @@ export class CxClient {
         result.syncMode = this.config.isSyncMode;
 
         if (config.enableSastScan) {
-            if(!await this.isSASTSupportsCriticalSeverity() && (this.sastConfig.criticalThreshold > 0 || this.sastConfig.failBuildForNewVulnerabilitiesSeverity == 'CRITICAL'))
+            if(!await this.isSASTSupportsCriticalSeverity() && this.sastConfig.vulnerabilityThreshold)
             {
                 this.sastConfig.criticalThreshold = 0;
-                this.sastConfig.failBuildForNewVulnerabilitiesSeverity = '';
+                if(this.sastConfig.failBuildForNewVulnerabilitiesSeverity == "CRITICAL")
+                {
+                    this.sastConfig.failBuildForNewVulnerabilitiesSeverity = '';
+                }
                 this.log.warning('Below SAST 9.7 version does not supports critical severity because of that ignoring critical threshold.');
             }
             result.updateSastDefaultResults(this.sastConfig);
