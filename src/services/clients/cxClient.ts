@@ -643,16 +643,31 @@ export class CxClient {
         const newMedium = (result.newMediumCount > 0 && result.failBuildForNewVulnerabilitiesEnabled) ? " (" + result.newMediumCount + " new)" : "";
         const newLow = (result.newLowCount > 0 && result.failBuildForNewVulnerabilitiesEnabled) ? " (" + result.newLowCount + " new)" : "";
         const newInfo = (result.newInfoCount > 0 && result.failBuildForNewVulnerabilitiesEnabled) ? " (" + result.newInfoCount + " new)" : "";
-        this.log.info(`----------------------------Checkmarx Scan Results(CxSAST):-------------------------------
-Critical severity results: ${result.criticalResults}${newCritical}
-High severity results: ${result.highResults}${newHigh}
-Medium severity results: ${result.mediumResults}${newMedium}
-Low severity results: ${result.lowResults}${newLow}
-Info severity results: ${result.infoResults}${newInfo}
+        if(result.criticalResults != undefined)
+        {
+            this.log.info(`----------------------------Checkmarx Scan Results(CxSAST):-------------------------------
+            Critical severity results: ${result.criticalResults}${newCritical}
+            High severity results: ${result.highResults}${newHigh}
+            Medium severity results: ${result.mediumResults}${newMedium}
+            Low severity results: ${result.lowResults}${newLow}
+            Info severity results: ${result.infoResults}${newInfo}
 
-Scan results location:  ${result.sastScanResultsLink}
-------------------------------------------------------------------------------------------
-`);
+            Scan results location:  ${result.sastScanResultsLink}
+            ------------------------------------------------------------------------------------------
+            `);
+        }
+        else
+        {
+            this.log.info(`----------------------------Checkmarx Scan Results(CxSAST):-------------------------------
+            High severity results: ${result.highResults}${newHigh}
+            Medium severity results: ${result.mediumResults}${newMedium}
+            Low severity results: ${result.lowResults}${newLow}
+            Info severity results: ${result.infoResults}${newInfo}
+
+            Scan results location:  ${result.sastScanResultsLink}
+            ------------------------------------------------------------------------------------------
+            `);
+        }
     }
 
     private static toJsonQueries(scanResult: ScanResults, queries: any[]) {
