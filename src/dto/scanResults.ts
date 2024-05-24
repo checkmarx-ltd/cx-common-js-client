@@ -18,6 +18,7 @@ export class ScanResults {
     scanId = 0;
     thresholdEnabled: boolean = false;
 
+    criticalThreshold: number | undefined;
     highThreshold: number | undefined;
     mediumThreshold: number | undefined;
     lowThreshold: number | undefined;
@@ -40,10 +41,12 @@ export class ScanResults {
     osaViolations = [];
     osaPolicies = [];
     failBuildForNewVulnerabilitiesEnabled: boolean = false;
+    criticalResults = 0;
     highResults = 0;
     mediumResults = 0;
     lowResults = 0;
     infoResults = 0;
+    newCriticalCount = 0;
     newHighCount = 0;
     newMediumCount = 0;
     newLowCount = 0;
@@ -86,6 +89,7 @@ export class ScanResults {
         this.url = sastConfig.serverUrl;
         this.enablePolicyViolations = sastConfig.enablePolicyViolations;
         this.thresholdEnabled = sastConfig.vulnerabilityThreshold;
+        this.criticalThreshold = sastConfig.criticalThreshold;
         this.highThreshold = sastConfig.highThreshold;
         this.mediumThreshold = sastConfig.mediumThreshold;
         this.lowThreshold = sastConfig.lowThreshold;

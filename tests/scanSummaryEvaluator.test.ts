@@ -24,6 +24,7 @@ describe("ScanSummaryEvaluator", function () {
 
     it('should return threshold errors in summary', function () {
         const config = getSastConfig();
+        config.criticalThreshold = 3;
         config.highThreshold = 1;
         config.mediumThreshold = 5;
         config.lowThreshold = 10;
@@ -33,6 +34,7 @@ describe("ScanSummaryEvaluator", function () {
 
         const scanResults = new ScanResults();
         scanResults.updateSastDefaultResults(config);
+        scanResults.criticalResults = 1;
         scanResults.highResults = 3;
         scanResults.mediumResults = 8;
         scanResults.lowResults = 4;
@@ -44,6 +46,7 @@ describe("ScanSummaryEvaluator", function () {
 
     it('should not return threshold errors if all values are below thresholds', function () {
         const config = getSastConfig();
+        config.criticalThreshold = 10;
         config.highThreshold = 10;
         config.mediumThreshold = 15;
         config.lowThreshold = 20;
@@ -53,6 +56,7 @@ describe("ScanSummaryEvaluator", function () {
 
         const scanResults = new ScanResults();
         scanResults.updateSastDefaultResults(config);
+        scanResults.criticalResults = 2;
         scanResults.highResults = 2;
         scanResults.mediumResults = 11;
         scanResults.lowResults = 18;
@@ -65,6 +69,7 @@ describe("ScanSummaryEvaluator", function () {
 
 function getSastConfig(): SastConfig {
     return {
+        criticalThreshold: 0,
         highThreshold: 0,
         lowThreshold: 0,
         mediumThreshold: 0,

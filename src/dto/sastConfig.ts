@@ -21,6 +21,7 @@ export interface SastConfig {
     vulnerabilityThreshold: boolean;
     failBuildForNewVulnerabilitiesEnabled: boolean;
     failBuildForNewVulnerabilitiesSeverity: string;
+    criticalThreshold?: number;
     highThreshold?: number;
     mediumThreshold?: number;
     lowThreshold?: number;
