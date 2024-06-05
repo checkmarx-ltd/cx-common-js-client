@@ -585,7 +585,7 @@ export class CxClient {
 
     private async addStatisticsToScanResults(result: ScanResults) {
         const statistics = await this.sastClient.getScanStatistics(result.scanId);
-        result.criticalResults = statistics.crticalSeverity;
+        result.criticalResults = statistics.criticalSeverity;
         result.highResults = statistics.highSeverity;
         result.mediumResults = statistics.mediumSeverity;
         result.lowResults = statistics.lowSeverity;
