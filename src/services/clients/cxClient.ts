@@ -64,7 +64,7 @@ export class CxClient {
                 {
                     this.sastConfig.failBuildForNewVulnerabilitiesSeverity = '';
                 }
-                this.log.warning('Below SAST 9.7 version does not supports critical severity because of that ignoring critical threshold.');
+                this.log.warning('SAST 9.6 and lower version does not supports critical severity because of that ignoring critical threshold.');
             }
             result.updateSastDefaultResults(this.sastConfig);
             this.log.info('Initializing Cx client');
