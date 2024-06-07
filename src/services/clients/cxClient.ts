@@ -271,7 +271,7 @@ export class CxClient {
     private async isPriorVersion(version: string, proirToVersion: string): Promise<boolean> {
         try {
             const value = version.split(".");
-            var currentVersion = (value[0]) + "." + (value[1]);
+            let currentVersion = (value[0]) + "." + (value[1]);
             if (parseFloat(currentVersion) < parseFloat(proirToVersion)) {
                 return true;
             }
