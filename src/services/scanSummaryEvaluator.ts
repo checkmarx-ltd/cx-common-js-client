@@ -21,6 +21,7 @@ export abstract class ScanSummaryEvaluator {
 
     private static getSastThresholdErrors(scanResult: any, config: any) {
         const result: ThresholdError[] = [];
+        ScanSummaryEvaluator.addThresholdErrors(scanResult.criticalResults, config.criticalThreshold, 'critical', result);
         ScanSummaryEvaluator.addThresholdErrors(scanResult.highResults, config.highThreshold, 'high', result);
         ScanSummaryEvaluator.addThresholdErrors(scanResult.mediumResults, config.mediumThreshold, 'medium', result);
         ScanSummaryEvaluator.addThresholdErrors(scanResult.lowResults, config.lowThreshold, 'low', result);
@@ -83,6 +84,13 @@ export abstract class ScanSummaryEvaluator {
             result.push({
                 severity, 
                 severityCount: scanResult.newHighCount
+            });    
+            severity = "CRITICAL";        
+        }
+        if(severity === "CRITICAL" && scanResult.newCriticalCount > 0){
+            result.push({
+                severity, 
+                severityCount: scanResult.newCriticalCount
             });            
         }
         return result;

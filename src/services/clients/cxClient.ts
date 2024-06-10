@@ -57,6 +57,15 @@ export class CxClient {
         result.syncMode = this.config.isSyncMode;
 
         if (config.enableSastScan) {
+            if(!await this.isSASTSupportsCriticalSeverity() && this.sastConfig.vulnerabilityThreshold)
+            {
+                this.sastConfig.criticalThreshold = 0;
+                if(this.sastConfig.failBuildForNewVulnerabilitiesSeverity == "CRITICAL")
+                {
+                    this.sastConfig.failBuildForNewVulnerabilitiesSeverity = '';
+                }
+                this.log.warning('SAST 9.6 and lower version does not supports critical severity because of that ignoring critical threshold.');
+            }
             result.updateSastDefaultResults(this.sastConfig);
             this.log.info('Initializing Cx client');
             await this.initClients(httpClient);
@@ -262,7 +271,7 @@ export class CxClient {
     private async isPriorVersion(version: string, proirToVersion: string): Promise<boolean> {
         try {
             const value = version.split(".");
-            var currentVersion = (value[0]) + "." + (value[1]);
+            let currentVersion = (value[0]) + "." + (value[1]);
             if (parseFloat(currentVersion) < parseFloat(proirToVersion)) {
                 return true;
             }
@@ -274,6 +283,25 @@ export class CxClient {
         }
     }
 
+    private async isSASTSupportsCriticalSeverity(): Promise<boolean> {
+        try {
+            let versionInfo = await this.getVersionInfo();
+            let version = versionInfo.version;
+
+            const value = version.split(".");
+            var currentVersion = (value[0]) + "." + (value[1]);
+            if(parseFloat(currentVersion) >= parseFloat("9.7"))
+            {
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        } catch (e) {
+            return false;
+        }
+    }
     private async isScanWithSettingsSupported(): Promise<boolean> {
         try {
             let versionInfo = await this.getVersionInfo();
@@ -319,18 +347,66 @@ export class CxClient {
             this.isNewProject = false;
         } else {
             this.log.info('Project not found, creating a new one.');
-            this.isNewProject = true;
-            if (this.sastConfig.denyProject) {
+            if (this.sastConfig.denyProject) 
+            {
                 throw Error(
                     `Creation of the new project [${this.config.projectName}] is not authorized. Please use an existing project.` +
                     " You can enable the creation of new projects by disabling the Deny new Checkmarx projects creation checkbox in the Checkmarx plugin global settings.");
             }
+            //Create newProject and checking if EnableSASTBranching is enabled then creating branch project 
+            if (this.sastConfig.enableSastBranching) 
+            {
+                if(!this.sastConfig.masterBranchProjectName)
+                {
+                    throw Error("Master branch project name is mandatory to create branched project.");
+                }
+                else
+                {
+                    let masterProjectId = await this.getProjectIdByProjectName(this.sastConfig.masterBranchProjectName);
 
-            projectId = await this.createNewProject();
+                    if(masterProjectId)
+                    {
+                        projectId = await this.createChildProject(masterProjectId,this.config.projectName);
+                        if(projectId == -1 )
+                        {
+                            throw Error('Branched project could not be created: ' + this.config.projectName);
+                        }
+                        else 
+                        {
+                            this.isNewProject = true;
+                        }
+                    }
+                    else
+                    {
+                        throw Error('Master branch project does not exist: ' + this.sastConfig.masterBranchProjectName);   
+                    }
+                }
+            }
+            else 
+            {
+                projectId = await this.createNewProject();
+                this.isNewProject = true;
+            }
             this.log.debug(`Project created. ID: ${projectId}`);
         }
 
         return projectId;
+    }
+
+    private async createChildProject(projectId :number,childProjectName :string) : Promise<number>
+    {
+        const project = {
+            name : childProjectName
+        };
+        const newProject = await this.httpClient.postRequest(`projects/${projectId}/branch`, project);
+        if (newProject != null || newProject)
+        {
+            return newProject.id;
+        }
+        else
+        {
+            throw Error(`CX Response for branch project request with name ${childProjectName} from existing project with ID ${projectId} was null`);
+        }
     }
 
     private async getCustomFieldsProjectName(): Promise<Array<CustomFields>> {
@@ -367,7 +443,7 @@ export class CxClient {
         let isOverrideProjectSettings = false;
         var apiVersionHeader = {};
         if (await this.isScanLevelCustomFieldSupported()) {
-            apiVersionHeader = { 'Content-type': 'application/json;v=1.2' };
+            apiVersionHeader = { 'Content-type': 'application/json;v=1.2' , 'version' : '1.2'};
         }
         isOverrideProjectSettings = this.sastConfig.overrideProjectSettings || this.isNewProject;
         const scanResponse: ScanWithSettingsResponse = await this.httpClient.postMultipartRequest('sast/scanWithSettings',
@@ -438,16 +514,32 @@ export class CxClient {
         return result;
     }
 
+    private async getProjectIdByProjectName(projectName :string): Promise<number> {
+        let result = 0;
+        const encodedName = encodeURIComponent(projectName);
+        const path = `projects?projectname=${encodedName}&teamid=${this.teamId}`;
+        try {
+            const projects = await this.httpClient.getRequest(path, { suppressWarnings: true });
+            if (projects && projects.length)
+                result = projects[0].id;
+            else
+                throw Error('Master branch project does not exist: ' + projectName);
+        } catch (err) {
+            const isExpectedError = err.response && err.response.notFound;
+            if (!isExpectedError) {
+                throw err;
+            }
+        }
+        return result;
+    }
+
     private async createNewProject(): Promise<number> {
         const request = {
             name: this.config.projectName,
             owningTeam: this.teamId,
             isPublic: this.sastConfig.isPublic
         };
-
         const newProject = await this.httpClient.postRequest('projects', request);
-        this.log.debug(`Created new project, ID: ${newProject.id}`);
-
         return newProject.id;
     }
 
@@ -493,6 +585,7 @@ export class CxClient {
 
     private async addStatisticsToScanResults(result: ScanResults) {
         const statistics = await this.sastClient.getScanStatistics(result.scanId);
+        result.criticalResults = statistics.criticalSeverity;
         result.highResults = statistics.highSeverity;
         result.mediumResults = statistics.mediumSeverity;
         result.lowResults = statistics.lowSeverity;
@@ -545,19 +638,37 @@ export class CxClient {
     }
 
     private printStatistics(result: ScanResults) {
+        const newCritical = (result.newCriticalCount > 0  && result.failBuildForNewVulnerabilitiesEnabled) ? " (" + result.newCriticalCount + " new)" : "";
         const newHigh = (result.newHighCount > 0  && result.failBuildForNewVulnerabilitiesEnabled) ? " (" + result.newHighCount + " new)" : "";
         const newMedium = (result.newMediumCount > 0 && result.failBuildForNewVulnerabilitiesEnabled) ? " (" + result.newMediumCount + " new)" : "";
         const newLow = (result.newLowCount > 0 && result.failBuildForNewVulnerabilitiesEnabled) ? " (" + result.newLowCount + " new)" : "";
         const newInfo = (result.newInfoCount > 0 && result.failBuildForNewVulnerabilitiesEnabled) ? " (" + result.newInfoCount + " new)" : "";
-        this.log.info(`----------------------------Checkmarx Scan Results(CxSAST):-------------------------------
-High severity results: ${result.highResults}${newHigh}
-Medium severity results: ${result.mediumResults}${newMedium}
-Low severity results: ${result.lowResults}${newLow}
-Info severity results: ${result.infoResults}${newInfo}
+        if(result.criticalResults != undefined)
+        {
+            this.log.info(`----------------------------Checkmarx Scan Results(CxSAST):-------------------------------
+            Critical severity results: ${result.criticalResults}${newCritical}
+            High severity results: ${result.highResults}${newHigh}
+            Medium severity results: ${result.mediumResults}${newMedium}
+            Low severity results: ${result.lowResults}${newLow}
+            Info severity results: ${result.infoResults}${newInfo}
 
-Scan results location:  ${result.sastScanResultsLink}
-------------------------------------------------------------------------------------------
-`);
+            Scan results location:  ${result.sastScanResultsLink}
+            ------------------------------------------------------------------------------------------
+            `);
+        }
+        else
+        {
+            this.log.info(`----------------------------Checkmarx Scan Results(CxSAST):-------------------------------
+            Critical severity results: ${result.criticalResults}${newCritical}
+High severity results: ${result.highResults}${newHigh}
+            Medium severity results: ${result.mediumResults}${newMedium}
+            Low severity results: ${result.lowResults}${newLow}
+            Info severity results: ${result.infoResults}${newInfo}
+
+            Scan results location:  ${result.sastScanResultsLink}
+            ------------------------------------------------------------------------------------------
+            `);
+        }
     }
 
     private static toJsonQueries(scanResult: ScanResults, queries: any[]) {
@@ -585,6 +696,8 @@ Scan results location:  ${result.sastScanResultsLink}
                 if(result.$.FalsePositive === "False" && result.$.Status === "New"){
                     severity = result.$.Severity;
                     switch(severity){
+                        case "Critical":
+                            scanResult.newCriticalCount++;
                         case "High":
                             scanResult.newHighCount++;
                             break;

@@ -15,11 +15,13 @@ export interface SastConfig {
     presetName: string;
     presetId?: number;
     scanTimeoutInMinutes?: number;
+    waitTimeForRetryScan?: number;
     enablePolicyViolations: boolean;
     generatePDFReport: boolean;
     vulnerabilityThreshold: boolean;
     failBuildForNewVulnerabilitiesEnabled: boolean;
     failBuildForNewVulnerabilitiesSeverity: string;
+    criticalThreshold?: number;
     highThreshold?: number;
     mediumThreshold?: number;
     lowThreshold?: number;
@@ -30,4 +32,6 @@ export interface SastConfig {
     postScanActionName: string;
     postScanActionId?: number;
     avoidDuplicateProjectScans:boolean;
+    enableSastBranching:boolean;
+    masterBranchProjectName: string;
 }
