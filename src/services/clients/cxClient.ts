@@ -646,26 +646,26 @@ export class CxClient {
         if(result.criticalResults != undefined)
         {
             this.log.info(`----------------------------Checkmarx Scan Results(CxSAST):-------------------------------
-            Critical severity results: ${result.criticalResults}${newCritical}
-            High severity results: ${result.highResults}${newHigh}
-            Medium severity results: ${result.mediumResults}${newMedium}
-            Low severity results: ${result.lowResults}${newLow}
-            Info severity results: ${result.infoResults}${newInfo}
+Critical severity results: ${result.criticalResults}${newCritical}
+High severity results: ${result.highResults}${newHigh}
+Medium severity results: ${result.mediumResults}${newMedium}
+Low severity results: ${result.lowResults}${newLow}
+Info severity results: ${result.infoResults}${newInfo}
 
-            Scan results location:  ${result.sastScanResultsLink}
-            ------------------------------------------------------------------------------------------
+Scan results location:  ${result.sastScanResultsLink}
+------------------------------------------------------------------------------------------
             `);
         }
         else
         {
             this.log.info(`----------------------------Checkmarx Scan Results(CxSAST):-------------------------------
-            High severity results: ${result.highResults}${newHigh}
-            Medium severity results: ${result.mediumResults}${newMedium}
-            Low severity results: ${result.lowResults}${newLow}
-            Info severity results: ${result.infoResults}${newInfo}
+High severity results: ${result.highResults}${newHigh}
+Medium severity results: ${result.mediumResults}${newMedium}
+Low severity results: ${result.lowResults}${newLow}
+Info severity results: ${result.infoResults}${newInfo}
 
-            Scan results location:  ${result.sastScanResultsLink}
-            ------------------------------------------------------------------------------------------
+Scan results location:  ${result.sastScanResultsLink}
+------------------------------------------------------------------------------------------
             `);
         }
     }
