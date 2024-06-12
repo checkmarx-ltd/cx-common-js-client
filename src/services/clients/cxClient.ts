@@ -659,8 +659,7 @@ export class CxClient {
         else
         {
             this.log.info(`----------------------------Checkmarx Scan Results(CxSAST):-------------------------------
-            Critical severity results: ${result.criticalResults}${newCritical}
-High severity results: ${result.highResults}${newHigh}
+            High severity results: ${result.highResults}${newHigh}
             Medium severity results: ${result.mediumResults}${newMedium}
             Low severity results: ${result.lowResults}${newLow}
             Info severity results: ${result.infoResults}${newInfo}
