@@ -345,6 +345,10 @@ export class CxClient {
         if (projectId) {
             this.log.debug(`Resolved project ID: ${projectId}`);
             this.isNewProject = false;
+            if (this.sastConfig.enableSastBranching)
+            {
+                throw Error(`Project with name ${this.config.projectName} is already exists. Cannot create branched project if project name already exists.`);
+            }
         } else {
             this.log.info('Project not found, creating a new one.');
             if (this.sastConfig.denyProject) 
