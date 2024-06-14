@@ -57,6 +57,8 @@ export class CxClient {
         result.syncMode = this.config.isSyncMode;
 
         if (config.enableSastScan) {
+            this.log.info('Initializing Cx client');
+            await this.initClients(httpClient);
             if(!await this.isSASTSupportsCriticalSeverity() && this.sastConfig.vulnerabilityThreshold)
             {
                 this.sastConfig.criticalThreshold = 0;
@@ -67,8 +69,6 @@ export class CxClient {
                 this.log.warning('SAST 9.6 and lower version does not supports critical severity because of that ignoring critical threshold.');
             }
             result.updateSastDefaultResults(this.sastConfig);
-            this.log.info('Initializing Cx client');
-            await this.initClients(httpClient);
             await this.initDynamicFields();
 
             if(this.sastConfig.avoidDuplicateProjectScans)
