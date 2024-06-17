@@ -13,6 +13,7 @@ export class Package {
      */
     private _matchType: string = '';
 
+    private _criticalVulnerabilityCount: number = 0;
     private _highVulnerabilityCount: number = 0;
     private _mediumVulnerabilityCount: number = 0;
     private _lowVulnerabilityCount: number = 0;
@@ -70,6 +71,14 @@ export class Package {
 
     public set matchType(value: string) {
         this._matchType = value;
+    }
+
+    public get criticalVulnerabilityCount(): number {
+        return this._criticalVulnerabilityCount;
+    }
+
+    public set criticalVulnerabilityCount(value: number) {
+        this._criticalVulnerabilityCount = value;
     }
 
     public get highVulnerabilityCount(): number {

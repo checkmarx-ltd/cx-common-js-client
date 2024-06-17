@@ -8,6 +8,7 @@ import { ScaConfig } from './scaConfig';
 
 export class ScaReportResults {
     private _resultReady: boolean = false;
+    private _criticalVulnerability: number = 0;
     private _highVulnerability: number = 0;
     private _mediumVulnerability: number = 0;
     private _lowVulnerability: number = 0;
@@ -16,6 +17,7 @@ export class ScaReportResults {
     private _nonVulnerableLibraries: number = 0;
     private _scanStartTime: string = '';
     private _scanEndTime: string = '';
+    private _dependencyCriticalCVEReportTable: CveReportTableRow[] = [];
     private _dependencyHighCVEReportTable: CveReportTableRow[] = [];
     private _dependencyMediumCVEReportTable: CveReportTableRow[] = [];
     private _dependencyLowCVEReportTable: CveReportTableRow[] = [];
@@ -23,6 +25,7 @@ export class ScaReportResults {
     private _packages: Package[] = [];
     private _summary: ScaSummaryResults | any;
     private _vulnerabilityThreshold: boolean = false;
+    private _criticalThreshold?: number;
     private _highThreshold?: number;
     private _mediumThreshold?: number;
     private _lowThreshold?: number;
@@ -30,6 +33,7 @@ export class ScaReportResults {
     constructor(scaResults: SCAResults, scaConfig: ScaConfig) {
         if (scaConfig) {
             this._vulnerabilityThreshold = scaConfig.vulnerabilityThreshold;
+            this._criticalThreshold = scaConfig.criticalThreshold;
             this._highThreshold = scaConfig.highThreshold;
             this._mediumThreshold = scaConfig.mediumThreshold;
             this._lowThreshold = scaConfig.lowThreshold;
@@ -42,6 +46,7 @@ export class ScaReportResults {
             this._summary = scaResults.summary;
 
             if (scaResults.summary) {
+                this._criticalVulnerability = scaResults.summary.criticalVulnerabilityCount;
                 this._highVulnerability = scaResults.summary.highVulnerabilityCount;
                 this._mediumVulnerability = scaResults.summary.mediumVulnerabilityCount;
                 this._lowVulnerability = scaResults.summary.lowVulnerabilityCount;
@@ -60,7 +65,8 @@ export class ScaReportResults {
         let sum: number;
         (this._packages || []).forEach(pckg => {
             if (pckg) {
-                sum = pckg.highVulnerabilityCount +
+                sum = pckg.criticalVulnerabilityCount +
+                    pckg.highVulnerabilityCount +
                     pckg.mediumVulnerabilityCount +
                     pckg.lowVulnerabilityCount;
                 if (sum === 0) {
@@ -87,6 +93,9 @@ export class ScaReportResults {
                 else if (finding.severity === Severity.HIGH) {
                     this._dependencyHighCVEReportTable.push(row);
                 }
+                else if (finding.severity === Severity.CRITICAL) {
+                    this._dependencyCriticalCVEReportTable.push(row);
+                }
             }
         });
     }
@@ -97,6 +106,14 @@ export class ScaReportResults {
 
     public set resultReady(value: boolean) {
         this._resultReady = value;
+    }
+
+    public get criticalVulnerability(): number {
+        return this._criticalVulnerability;
+    }
+
+    public set criticalVulnerability(value: number) {
+        this._criticalVulnerability = value;
     }
 
     public get highVulnerability(): number {
@@ -171,6 +188,14 @@ export class ScaReportResults {
         this._totalLibraries = value;
     }
 
+    public get dependencyCriticalCVEReportTable(): CveReportTableRow[] {
+        return this._dependencyCriticalCVEReportTable;
+    }
+
+    public set dependencyCriticalCVEReportTable(value: CveReportTableRow[]) {
+        this._dependencyCriticalCVEReportTable = value;
+    }
+
     public get dependencyHighCVEReportTable(): CveReportTableRow[] {
         return this._dependencyHighCVEReportTable;
     }
@@ -217,6 +242,14 @@ export class ScaReportResults {
 
     public set vulnerabilityThreshold(value: boolean) {
         this._vulnerabilityThreshold = value;
+    }
+
+    public get criticalThreshold(): number | undefined {
+        return this._criticalThreshold;
+    }
+
+    public set criticalThreshold(value: number | undefined) {
+        this._criticalThreshold = value;
     }
 
     public get highThreshold(): number | undefined {

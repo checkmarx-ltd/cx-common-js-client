@@ -1,5 +1,6 @@
 export class ScaSummaryResults {
     private _riskReportId: string = '';
+    private _criticalVulnerabilityCount: number = 0;
     private _highVulnerabilityCount: number = 0;
     private _mediumVulnerabilityCount: number = 0;
     private _lowVulnerabilityCount: number = 0;
@@ -15,6 +16,14 @@ export class ScaSummaryResults {
 
     public set riskReportId(value: string) {
         this._riskReportId = value;
+    }
+
+    public get criticalVulnerabilityCount(): number {
+        return this._criticalVulnerabilityCount;
+    }
+
+    public set criticalVulnerabilityCount(value: number) {
+        this._criticalVulnerabilityCount = value;
     }
 
     public get highVulnerabilityCount(): number {

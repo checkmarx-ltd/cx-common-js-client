@@ -539,6 +539,7 @@ The Build Failed for the Following Reasons:
         await this.printPolicyEvaluation(scaResults.scaPolicyViolation, this.config.scaEnablePolicyViolations);
         await this.determinePolicyViolation(scaResults);
         const vulResults = {
+            criticalResults:scaReportResults.criticalVulnerability,
             highResults: scaReportResults.highVulnerability,
             mediumResults: scaReportResults.mediumVulnerability,
             lowResults: scaReportResults.lowVulnerability
@@ -662,6 +663,7 @@ The Build Failed for the Following Reasons:
         this.log.info("\n----CxSCA risk report summary----");
         this.log.info("Created on: " + summary.createdOn);
         this.log.info("Direct packages: " + summary.directPackages);
+        this.log.info("Critical vulnerabilities: " + summary.criticalVulnerabilityCount);
         this.log.info("High vulnerabilities: " + summary.highVulnerabilityCount);
         this.log.info("Medium vulnerabilities: " + summary.mediumVulnerabilityCount);
         this.log.info("Low vulnerabilities: " + summary.lowVulnerabilityCount);
