@@ -27,6 +27,7 @@ export class ScanResults {
     osaScanId: string | null = null;
     osaProjectSummaryLink: string | null = null;
     osaThresholdEnabled = false;
+    osaCriticalThreshold = 0;
     osaHighThreshold = 0;
     osaMediumThreshold = 0;
     osaLowThreshold = 0;
@@ -78,6 +79,7 @@ export class ScanResults {
     queryList = '';
     osaStartTime = '';  // E.g. "2019-10-27T12:22:50.223"
     osaEndTime = '';
+    osaCriticalResults = 0;
     osaHighResults = 0;
     osaMediumResults = 0;
     osaLowResults = 0;

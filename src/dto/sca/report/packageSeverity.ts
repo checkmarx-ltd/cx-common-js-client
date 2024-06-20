@@ -5,5 +5,6 @@ export enum PackageSeverity {
     NONE = "NONE",
     LOW = "LOW",
     MEDIUM = "MEDIUM",
-    HIGH = "HIGH"
+    HIGH = "HIGH",
+    CRITICAL = "CRITICAL"
 }

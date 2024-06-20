@@ -15,6 +15,7 @@ export interface ScaConfig {
     dependencyFileExtension: string;
     dependencyFolderExclusion: string;
     vulnerabilityThreshold: boolean;
+    criticalThreshold?: number;
     highThreshold?: number;
     mediumThreshold?: number;
     lowThreshold?: number;
