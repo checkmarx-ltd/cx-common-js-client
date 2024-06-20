@@ -57,6 +57,8 @@ export class CxClient {
         result.syncMode = this.config.isSyncMode;
 
         if (config.enableSastScan) {
+            this.log.info('Initializing Cx client');
+            await this.initClients(httpClient);
             if(!await this.isSASTSupportsCriticalSeverity() && this.sastConfig.vulnerabilityThreshold)
             {
                 this.sastConfig.criticalThreshold = 0;
@@ -67,8 +69,6 @@ export class CxClient {
                 this.log.warning('SAST 9.6 and lower version does not supports critical severity because of that ignoring critical threshold.');
             }
             result.updateSastDefaultResults(this.sastConfig);
-            this.log.info('Initializing Cx client');
-            await this.initClients(httpClient);
             await this.initDynamicFields();
 
             if(this.sastConfig.avoidDuplicateProjectScans)
@@ -345,6 +345,10 @@ export class CxClient {
         if (projectId) {
             this.log.debug(`Resolved project ID: ${projectId}`);
             this.isNewProject = false;
+            if (this.sastConfig.enableSastBranching)
+            {
+                throw Error(`Project with name ${this.config.projectName} is already exists. Cannot create branched project as project name already exists.`);
+            }
         } else {
             this.log.info('Project not found, creating a new one.');
             if (this.sastConfig.denyProject) 
@@ -646,27 +650,26 @@ export class CxClient {
         if(result.criticalResults != undefined)
         {
             this.log.info(`----------------------------Checkmarx Scan Results(CxSAST):-------------------------------
-            Critical severity results: ${result.criticalResults}${newCritical}
-            High severity results: ${result.highResults}${newHigh}
-            Medium severity results: ${result.mediumResults}${newMedium}
-            Low severity results: ${result.lowResults}${newLow}
-            Info severity results: ${result.infoResults}${newInfo}
+Critical severity results: ${result.criticalResults}${newCritical}
+High severity results: ${result.highResults}${newHigh}
+Medium severity results: ${result.mediumResults}${newMedium}
+Low severity results: ${result.lowResults}${newLow}
+Info severity results: ${result.infoResults}${newInfo}
 
-            Scan results location:  ${result.sastScanResultsLink}
-            ------------------------------------------------------------------------------------------
+Scan results location:  ${result.sastScanResultsLink}
+------------------------------------------------------------------------------------------
             `);
         }
         else
         {
             this.log.info(`----------------------------Checkmarx Scan Results(CxSAST):-------------------------------
-            Critical severity results: ${result.criticalResults}${newCritical}
 High severity results: ${result.highResults}${newHigh}
-            Medium severity results: ${result.mediumResults}${newMedium}
-            Low severity results: ${result.lowResults}${newLow}
-            Info severity results: ${result.infoResults}${newInfo}
+Medium severity results: ${result.mediumResults}${newMedium}
+Low severity results: ${result.lowResults}${newLow}
+Info severity results: ${result.infoResults}${newInfo}
 
-            Scan results location:  ${result.sastScanResultsLink}
-            ------------------------------------------------------------------------------------------
+Scan results location:  ${result.sastScanResultsLink}
+------------------------------------------------------------------------------------------
             `);
         }
     }
