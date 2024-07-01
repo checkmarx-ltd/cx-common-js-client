@@ -86,7 +86,7 @@ export class ReportingClient {
         let response = await this.httpClient.getRequest(path);
         let status = response.status.value;
 
-        if (cxOrigin == "VSTS") {
+        if (cxOrigin && (cxOrigin.startsWith("ADO ") || cxOrigin.startsWith("TFS "))) {
             if (status === ReportStatus.Failed) {
                 this.log.warning("Failed on first report status request");
                 for (let i = 1; i < 5; i++) {

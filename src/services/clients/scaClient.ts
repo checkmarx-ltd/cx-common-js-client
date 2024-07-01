@@ -457,17 +457,16 @@ export class ScaClient {
             this.log.info(`scanConfig.enableProxy is TRUE`);
         }
 
-        if (this.proxyConfig && this.proxyConfig.proxyUrl) {
-
-            this.log.info(`proxyConfig is TRUE`);
-            this.log.info(`SCA proxy URL: ` + this.proxyConfig.proxyUrl);
+        let proxyUrl;
+        if (this.proxyConfig) {
+            proxyUrl = ProxyHelper.getFormattedProxy(this.proxyConfig);
+            this.log.info('Upload request is being routed via proxy');
         }
-        if (this.proxyConfig.proxyUrl) {
-            this.log.info(`proxyConfig.proxyUrl is TRUE`);
+        if (proxyUrl) {            
+            this.log.info(`SCA proxy URL: ` + proxyUrl);
         }
         //proxyConfig is instance of scaProxyConfig so proxyUrl set to proxyConfig proxy url 
-        if (this.scanConfig.enableProxy && this.proxyConfig && this.proxyConfig.proxyUrl) {
-            let proxyUrl = this.proxyConfig.proxyUrl;
+        if (proxyUrl) {            
             command = `curl -x ${proxyUrl} -X PUT -L "${uploadUrl}" -H "Content-Type:" -T "${file}" --ssl-no-revoke`;
             this.log.debug('command: '+command);
         } else {
