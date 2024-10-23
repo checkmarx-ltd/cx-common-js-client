@@ -682,9 +682,14 @@ Scan results location:  ${result.sastScanResultsLink}
             JSON.stringify({
                 name: query.$.name,
                 severity: query.$.Severity,
-                resultLength: query.Result.length
+                resultLength: this.getQueryResultCount(query.Result)
             })
         ).join(SEPARATOR);
+    }
+
+    private  static getQueryResultCount(Result: any[])
+    {
+        return  Result.length > 0 ? Result.filter( (queryResult )  =>  queryResult.$['state'] !== '1').length : 0;
     }
 
     private static getNewVulnerabilityCounts(scanResult: ScanResults, queries: any[]) {
