@@ -850,8 +850,8 @@ The Build Failed for the Following Reasons:
                 projectCustomTagObj = this.normalizeTags(this.config.projectCustomTags);
             let projectId = this.projectId;
             let path = ScaClient.PROJECTS + `/${projectId}`;
-            const teamName = this.config.scaSastTeam;
-            let teamNameArray: Array<string | undefined> = [teamName];
+            let teamName = this.config.scaSastTeam.trim();
+            let teamNameArray: Array<string | undefined> = (teamName != null && teamName != "" && teamName != '/') ? [teamName] : [];
             const request = {
                 name: this.scanConfig.projectName,
                 AssignedTeams: teamNameArray,
