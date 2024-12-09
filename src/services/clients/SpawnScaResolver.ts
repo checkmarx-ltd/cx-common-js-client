@@ -53,15 +53,28 @@ export class SpawnScaResolver {
             
             child.stderr.on("data", (x: any) => {                                       
                 errorOccured = x.toString();  
-                errorOccured = errorOccured.replace(/(\r\n|\n|\r)/gm, "");              
-                if(errorOccured !='')  {
-                log.debug('Error occurred while running SCA Resolver:' + errorOccured); 
+                errorOccured = errorOccured.replace(/(\r\n|\n|\r)/gm, "");  
+                if(errorOccured.includes('Permission denied') || errorOccured.includes('Access is denied'))            
+                {
+                  log.debug('Access was denied while attempting to execute the SCA Resolver command: ' + scaResolverCommand);
+                }
+                else if(errorOccured !='')
+                {
+                 log.debug('Error occurred while running SCA Resolver:' + errorOccured); 
                 }                       
               });
 
               child.on('error', (err: any) => { 
-                log.debug(`Error occurred while running SCA Resolver:  ${err}`); 
-                throw new Error(`Error occurred while running SCA Resolver.` + err);
+                if(errorOccured.includes('Permission denied') || errorOccured.includes('Access is denied'))            
+                {
+                  log.debug(`Access was denied while attempting to execute the SCA Resolver command:  ${scaResolverCommand}`); 
+                  throw new Error(`Access was denied while attempting to execute the SCA Resolver command: ` + scaResolverCommand);
+                }
+                else
+                {
+                  log.debug(`Error occurred while running SCA Resolver:  ${err}`); 
+                  throw new Error(`Error occurred while running SCA Resolver.` + err);
+                }
              });
 
               child.on("exit", (code: any) => {
@@ -77,7 +90,15 @@ export class SpawnScaResolver {
     }       
         
     }catch(err){
-        throw Error(`Error occurred while running SCA Resolver.`+err);
+      let errMessage = '';
+      errMessage = err.toString();  
+      if(errMessage.includes('Permission denied') || errMessage.includes('Access is denied'))            
+        {
+          throw Error('Access was denied while attempting to execute the SCA Resolver command: ' + scaResolverCommand);
+        }
+        else{
+          throw Error(`Error occurred while running SCA Resolver.`+err);
+        }
     }
     return exitCode;    
 }   
