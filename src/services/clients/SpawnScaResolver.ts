@@ -94,7 +94,6 @@ export class SpawnScaResolver {
       errMessage = err.toString();  
       if(errMessage.includes('Permission denied') || errMessage.includes('Access is denied'))            
         {
-          log.debug('Inside Condition');
           throw Error('Access was denied while attempting to execute the SCA Resolver command: ' + scaResolverCommand);
         }
         else{
