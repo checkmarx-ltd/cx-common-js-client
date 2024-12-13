@@ -649,28 +649,24 @@ export class CxClient {
         const newInfo = (result.newInfoCount > 0 && result.failBuildForNewVulnerabilitiesEnabled) ? " (" + result.newInfoCount + " new)" : "";
         if(result.criticalResults != undefined)
         {
-            this.log.info(`----------------------------Checkmarx Scan Results(CxSAST):-------------------------------
-Critical severity results: ${result.criticalResults}${newCritical}
-High severity results: ${result.highResults}${newHigh}
-Medium severity results: ${result.mediumResults}${newMedium}
-Low severity results: ${result.lowResults}${newLow}
-Info severity results: ${result.infoResults}${newInfo}
-
-Scan results location:  ${result.sastScanResultsLink}
-------------------------------------------------------------------------------------------
-            `);
+            this.log.info(`----------------------------Checkmarx Scan Results(CxSAST):-------------------------------`);
+            this.log.info(`Critical severity results: ${result.criticalResults}${newCritical}`);
+            this.log.info(`High severity results: ${result.highResults}${newHigh}`);
+            this.log.info(`Medium severity results: ${result.mediumResults}${newMedium}`);
+            this.log.info(`Low severity results: ${result.lowResults}${newLow}`);
+            this.log.info(`Info severity results: ${result.infoResults}${newInfo} \n`);
+            this.log.info(`Scan results location:  ${result.sastScanResultsLink}`);
+            this.log.info(`------------------------------------------------------------------------------------------`);
         }
         else
         {
-            this.log.info(`----------------------------Checkmarx Scan Results(CxSAST):-------------------------------
-High severity results: ${result.highResults}${newHigh}
-Medium severity results: ${result.mediumResults}${newMedium}
-Low severity results: ${result.lowResults}${newLow}
-Info severity results: ${result.infoResults}${newInfo}
-
-Scan results location:  ${result.sastScanResultsLink}
-------------------------------------------------------------------------------------------
-            `);
+            this.log.info(`----------------------------Checkmarx Scan Results(CxSAST):-------------------------------`);
+            this.log.info(`High severity results: ${result.highResults}${newHigh}`);
+            this.log.info(`Medium severity results: ${result.mediumResults}${newMedium}`);
+            this.log.info(`Low severity results: ${result.lowResults}${newLow}`);
+            this.log.info(`Info severity results: ${result.infoResults}${newInfo} \n`);
+            this.log.info(`Scan results location:  ${result.sastScanResultsLink}`);
+            this.log.info(`------------------------------------------------------------------------------------------`);
         }
     }
 
@@ -799,10 +795,7 @@ The Build Failed for the Following Reasons:
 
     private logPolicyCheckSummary(policyCheck: { wasPerformed: boolean; violatedPolicyNames: string[] }) {
         if (policyCheck.wasPerformed) {
-            this.log.info(
-                `-----------------------------------------------------------------------------------------
-Policy Management:
---------------------`);
+            this.log.info(`---------------------------- Policy Management: --------------------`);
             if (policyCheck.violatedPolicyNames.length) {
                 this.log.info('Project policy status: violated');
 
@@ -811,7 +804,7 @@ Policy Management:
             } else {
                 this.log.info('Project policy status: compliant');
             }
-            this.log.info('-----------------------------------------------------------------------------------------');
+            this.log.info('--------------------------------------------------------------------');
         }
     }
 
