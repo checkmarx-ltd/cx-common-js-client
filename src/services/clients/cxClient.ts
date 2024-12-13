@@ -795,7 +795,7 @@ The Build Failed for the Following Reasons:
 
     private logPolicyCheckSummary(policyCheck: { wasPerformed: boolean; violatedPolicyNames: string[] }) {
         if (policyCheck.wasPerformed) {
-            this.log.info(`----------------------------------------------------------------------------------------- Policy Management: --------------------`);
+            this.log.info(`---------------------------- Policy Management: --------------------`);
             if (policyCheck.violatedPolicyNames.length) {
                 this.log.info('Project policy status: violated');
 
@@ -804,7 +804,7 @@ The Build Failed for the Following Reasons:
             } else {
                 this.log.info('Project policy status: compliant');
             }
-            this.log.info('-----------------------------------------------------------------------------------------');
+            this.log.info('--------------------------------------------------------------------');
         }
     }
 
