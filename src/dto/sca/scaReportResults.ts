@@ -65,7 +65,7 @@ export class ScaReportResults {
         let sum: number;
         (this._packages || []).forEach(pckg => {
             if (pckg) {
-                sum = pckg.criticalVulnerabilityCount +
+                sum = pckg.criticalVulnerabilityCount != undefined ? pckg.criticalVulnerabilityCount : 0 +
                     pckg.highVulnerabilityCount +
                     pckg.mediumVulnerabilityCount +
                     pckg.lowVulnerabilityCount;
