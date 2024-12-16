@@ -678,7 +678,8 @@ export class CxClient {
             JSON.stringify({
                 name: query.$.name,
                 severity: query.$.Severity,
-                resultLength: this.getQueryResultCount(query.Result)
+                resultLength: this.getQueryResultCount(query.Result),
+                SeverityIndex : query.$.SeverityIndex
             })
         ).join(SEPARATOR);
     }
