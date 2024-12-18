@@ -583,10 +583,10 @@ The Build Failed for the Following Reasons:
                 let rules: PolicyRule[] = [];
                 const pol = policy[index];
 
-                this.log.info("  Policy name: " + pol.name + " | Violated:" + pol.isViolated + " | Policy Description: " + pol.description);
+                this.log.info("Policy name: " + pol.name + " | Violated:" + pol.isViolated + " | Policy Description: " + pol.description);
                 rules = pol.rules;
                 rules.forEach((value) => {
-                    this.log.info("     Rule name: " + value.name + " | Violated: " + value.isViolated);
+                    this.log.info("Rule name: " + value.name + " | Violated: " + value.isViolated);
                 });
             }
             this.log.info("-----------------------------------------------------------");
@@ -660,7 +660,7 @@ The Build Failed for the Following Reasons:
     }
 
     private printSummaryResult(summary: ScaSummaryResults) {
-        this.log.info("\n----CxSCA risk report summary----");
+        this.log.info("----CxSCA risk report summary----");
         this.log.info("Created on: " + summary.createdOn);
         this.log.info("Direct packages: " + summary.directPackages);
         this.log.info("Critical vulnerabilities: " + summary.criticalVulnerabilityCount);
