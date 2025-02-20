@@ -629,7 +629,8 @@ export class CxClient {
         result.queryList = CxClient.toJsonQueries(result, doc.Query);
 
         //Find if there are any new vulnerabilities
-        CxClient.getNewVulnerabilityCounts(result, doc.Query);        
+        CxClient.getNewVulnerabilityCounts(result, doc.Query);  
+        // TODO: PowerShell code also adds properties such as newHighCount, but they are not used in the UI.
     }
 
 
