@@ -22,6 +22,7 @@ import { ScanWithSettingsResponse } from "../../dto/api/scanWithSettingsResponse
 import { NewVulnerabilitiesThresholdError } from "../../dto/newVulnerabilitiesThresholdError";
 import { CustomFields } from "../../dto/api/customFields";
 const fs = require('fs');
+import { engineConfiguration } from "../../dto/api/engineConfiguration";
 
 /**
  * High-level CX API client that uses specialized clients internally.
@@ -59,6 +60,19 @@ export class CxClient {
         if (config.enableSastScan) {
             this.log.info('Initializing Cx client');
             await this.initClients(httpClient);
+            if (this.config.originName == "VSTS")
+            {
+                let configId = await this.getEngineConfigurationId(this.sastConfig.engineConfigurationName);
+                if(configId == 0)
+                {
+                    if(this.sastConfig.engineConfigurationName == "Force Scan")
+                        this.log.error(`The Build Failed : SAST Engine Version 9.6.2 and lower version does not supports Force Scan (Source character encoding Configuration).`);
+                    else
+                        this.log.error(`The Build Failed : Selected source character encoding Configuration -> ${this.sastConfig.engineConfigurationName} not found.`);
+                }
+                else
+                    this.sastConfig.engineConfigurationId = configId;
+            }
             if(!await this.isSASTSupportsCriticalSeverity() && this.sastConfig.vulnerabilityThreshold)
             {
                 this.sastConfig.criticalThreshold = 0;
@@ -111,6 +125,23 @@ export class CxClient {
         return result;
     }
 
+    private async getEngineConfigurationId(engineConfigurationName :string) : Promise<number> {
+        let engineConfigId : number= 0;
+        try {
+            const engineConfigurationDetails : engineConfiguration[] = await this.httpClient.getRequest('sast/engineConfigurations', { suppressWarnings: true });
+            if (engineConfigurationDetails && engineConfigurationDetails.length) 
+            {
+                engineConfigId = engineConfigurationDetails.find(conf => conf.name === engineConfigurationName.trim())?.id ?? 0;
+            }
+        } catch (err) {
+            const isExpectedError = err.response && err.response.notFound;
+            if (!isExpectedError) {
+                throw err;
+            }
+        }
+        return engineConfigId;
+    }
+    
     private async generatePDFReport(scanResult: ScanResults){
         this.log.info("Generating PDF Report");
         const client = new ReportingClient(this.httpClient, this.log, "PDF");
