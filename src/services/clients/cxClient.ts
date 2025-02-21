@@ -65,10 +65,12 @@ export class CxClient {
                 let configId = await this.getEngineConfigurationId(this.sastConfig.engineConfigurationName);
                 if(configId == 0)
                 {
-                    if(this.sastConfig.engineConfigurationName == "Force Scan")
-                        this.log.error(`The Build Failed : SAST Engine Version 9.6.2 and lower version does not supports Force Scan (Source character encoding Configuration).`);
+                    result.buildFailed = true;
+                    if(this.sastConfig.engineConfigurationName == "Fast Scan")
+                        throw new Error("The Build Failed : SAST Engine Version 9.6.2 and lower version does not supports Force Scan (Source character encoding Configuration).");
                     else
-                        this.log.error(`The Build Failed : Selected source character encoding Configuration -> ${this.sastConfig.engineConfigurationName} not found.`);
+                        throw new Error("The Build Failed : Selected source character encoding Configuration -> ${this.sastConfig.engineConfigurationName} not found.");
+                    return Promise.reject(status); 
                 }
                 else
                     this.sastConfig.engineConfigurationId = configId;
