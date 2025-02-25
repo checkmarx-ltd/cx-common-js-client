@@ -29,7 +29,6 @@ export interface SastConfig {
     projectCustomFields: string;
     customFields: string;
     engineConfigurationId?: number;
-    engineConfigurationName?: string;
     postScanActionName: string;
     postScanActionId?: number;
     avoidDuplicateProjectScans:boolean;
