@@ -22,6 +22,8 @@ import { ScanWithSettingsResponse } from "../../dto/api/scanWithSettingsResponse
 import { NewVulnerabilitiesThresholdError } from "../../dto/newVulnerabilitiesThresholdError";
 import { CustomFields } from "../../dto/api/customFields";
 const fs = require('fs');
+import { engineConfiguration } from "../../dto/api/engineConfiguration";
+import { engineConfigurationConstants } from "../../dto/api/engineConfigurationConstants";
 
 /**
  * High-level CX API client that uses specialized clients internally.
@@ -36,7 +38,7 @@ export class CxClient {
     private projectId = 0;
     private presetId = 0;
     private postScanActionId : string = "";
-    private engineConfigurationId = 1;
+    private engineConfigurationId = 0;
     private isPolicyEnforcementSupported = false;
     private config: ScanConfig | any;
     private sastConfig: SastConfig | any;
@@ -59,6 +61,7 @@ export class CxClient {
         if (config.enableSastScan) {
             this.log.info('Initializing Cx client');
             await this.initClients(httpClient);
+            if (this.config.originName == "VSTS") await this.initializeEngineConfig();
             if(!await this.isSASTSupportsCriticalSeverity() && this.sastConfig.vulnerabilityThreshold)
             {
                 this.sastConfig.criticalThreshold = 0;
@@ -111,6 +114,23 @@ export class CxClient {
         return result;
     }
 
+    private async getEngineConfigurationId(engineConfigurationName :string) : Promise<number> {
+        let engineConfigId : number= 0;
+        try {
+            const engineConfigurationDetails : engineConfiguration[] = await this.httpClient.getRequest('sast/engineConfigurations', { suppressWarnings: true });
+            if (engineConfigurationDetails && engineConfigurationDetails.length) 
+            {
+                engineConfigId = engineConfigurationDetails.find(conf => conf.name === engineConfigurationName.trim())?.id ?? 0;
+            }
+        } catch (err) {
+            const isExpectedError = err.response && err.response.notFound;
+            if (!isExpectedError) {
+                throw err;
+            }
+        }
+        return engineConfigId;
+    }
+    
     private async generatePDFReport(scanResult: ScanResults){
         this.log.info("Generating PDF Report");
         const client = new ReportingClient(this.httpClient, this.log, "PDF");
@@ -729,6 +749,27 @@ export class CxClient {
             this.log.info('Checkmarx server version is lower than 9.0.');
         }
         return versionInfo;
+    }
+
+    private async initializeEngineConfig()
+    {
+        if(engineConfigurationConstants[this.sastConfig.engineConfigurationId] == engineConfigurationConstants[0]){
+            this.sastConfig.engineConfigurationId = 0;
+        }
+        else {
+            let configId = await this.getEngineConfigurationId(engineConfigurationConstants[this.sastConfig.engineConfigurationId]);
+            if(configId == 0)
+            {
+                if(engineConfigurationConstants[this.sastConfig.engineConfigurationId] == engineConfigurationConstants[6])
+                    throw new Error("The Build Failed : SAST Engine Version 9.6.2 and lower version does not supports Force Scan (Source character encoding Configuration).");
+                else
+                    throw new Error("The Build Failed : Selected source character encoding Configuration -> ${this.sastConfig.engineConfigurationName} not found.");
+                
+                return Promise.reject(status); 
+            }
+            else
+                this.sastConfig.engineConfigurationId = configId;
+        } 
     }
 
     private async initDynamicFields() {
