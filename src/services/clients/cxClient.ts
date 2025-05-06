@@ -120,7 +120,7 @@ export class CxClient {
             const engineConfigurationDetails : engineConfiguration[] = await this.httpClient.getRequest('sast/engineConfigurations', { suppressWarnings: true });
             if (engineConfigurationDetails && engineConfigurationDetails.length) 
             {
-                engineConfigId = engineConfigurationDetails.find(conf => conf.name === engineConfigurationName.trim())?.id ?? 0;
+                engineConfigId = engineConfigurationDetails.find(conf => conf.name === engineConfigurationName)?.id ?? 0;
             }
         } catch (err) {
             const isExpectedError = err.response && err.response.notFound;
