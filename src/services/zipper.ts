@@ -49,6 +49,21 @@ export default class Zipper {
                     this.log.debug('Discovering files in source directory.');
                     // followLinks is set to true to conform to Common Client behavior.
                     const walker = walk(this.srcDir, { followLinks: true });
+                     walker.on('directories', (parentDir: string, dirArray: { name: string }[], nextDir: () => void) => {
+                // Filter out any subdirectory that should be excluded
+                const keptDirs = dirArray.filter(dirInfo => {
+                    const absoluteDirPath = upath.resolve(parentDir, dirInfo.name);
+                    const relativeDirPath = upath.relative(this.srcDir, absoluteDirPath);
+                    // We'll decide to KEEP it only if it passes include/exclude rules
+                    return this.shouldDescendIntoDirectory(relativeDirPath);
+                });
+
+                // mutate dirArray in-place so walker will only descend into keptDirs
+                dirArray.length = 0;
+                dirArray.push(...keptDirs);
+
+                nextDir();
+            });
                     walker.on('file', this.addFileToArchive);
                     walker.on('end', () => {
                         this.log.debug('Finished discovering files in source directory.');
@@ -90,6 +105,23 @@ export default class Zipper {
         });
         return result;
     }
+    private shouldDescendIntoDirectory(relativeDirPath: string): boolean {
+    // Normalize to folder-style path with trailing slash so filters like "node_modules/**" match cleanly
+    const normalized = relativeDirPath ? relativeDirPath.replace(/\\/g, "/") + "/" : "";
+
+    const passesAnd = this.filenameFiltersAnd.every(filter => filter.includes(normalized));
+    const passesOr =
+        this.filenameFiltersOr.length === 0 ||
+        this.filenameFiltersOr.some(filter => filter.includes(normalized));
+
+    const keep = passesAnd && passesOr;
+
+    if (!keep) {
+        this.log.debug(`Prune directory (skip walking into): ${relativeDirPath || "."}`);
+    }
+
+    return keep;
+}
 
     private addFileToArchive = (parentDir: string, fileStats: any, discoverNextFile: () => void) => {
         const absoluteFilePath = upath.resolve(parentDir, fileStats.name);
