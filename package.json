@@ -50,10 +50,10 @@
     "snapdragon": "^0.12.1",
     "superagent": "^10.2.3",
     "superagent-proxy": "^3.0.0",
-    "tmp": "^0.1.0",
+    "tmp": "^0.2.5",
     "upath": "^1.2.0",
     "walk": "^2.3.14",
-    "xml2js": "^0.4.22",
+    "xml2js": "^0.6.2",
     "y18n": "^4.0.1"
   },
   "devDependencies": {
