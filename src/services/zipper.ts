@@ -117,7 +117,7 @@ export default class Zipper {
     const keep = passesAnd && passesOr;
 
     if (!keep) {
-        this.log.debug(`Prune directory (skip walking into): ${relativeDirPath || "."}`);
+        this.log.debug(`Skip: ${relativeDirPath || "."}(directory)`);
     }
 
     return keep;
