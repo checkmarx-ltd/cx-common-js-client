@@ -52,7 +52,22 @@ export default class Zipper {
                      walker.on('directories', (parentDir: string, dirArray: { name: string }[], nextDir: () => void) => {
                 // Filter out any subdirectory that should be excluded
                 const keptDirs = dirArray.filter(dirInfo => {
-                    const absoluteDirPath = upath.resolve(parentDir, dirInfo.name);
+                    const name = dirInfo.name;
+                    // Skip dot entries early 
+                    if (name === '.' || name === '..') {
+                        this.log?.debug?.(`Skip: ${name} (directory)`);
+                        return false;
+                    }
+                    const absoluteDirPath = upath.resolve(parentDir, name);
+                    // Skip symbolic link directories
+                    try {
+                        if (fs.lstatSync(absoluteDirPath).isSymbolicLink()) {
+                            this.log?.debug?.(`Skip: ${absoluteDirPath} (symlink directory)`);
+                            return false;
+                        }
+                    } catch {
+                        // preserve previous behavior: treat as non-symlink and continue
+                    }
                     const relativeDirPath = upath.relative(this.srcDir, absoluteDirPath);
                     // We'll decide to KEEP it only if it passes include/exclude rules
                     return this.shouldDescendIntoDirectory(relativeDirPath);
