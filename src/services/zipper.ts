@@ -65,8 +65,8 @@ export default class Zipper {
                             this.log?.debug?.(`Skip: ${absoluteDirPath} (symlink directory)`);
                             return false;
                         }
-                    } catch {
-                        // preserve previous behavior: treat as non-symlink and continue
+                    } catch(err) {
+                          this.log.warning(`lstat failed for ${absoluteDirPath}: ${err.message}`);
                     }
                     const relativeDirPath = upath.relative(this.srcDir, absoluteDirPath);
                     // We'll decide to KEEP it only if it passes include/exclude rules
