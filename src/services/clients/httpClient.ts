@@ -498,9 +498,30 @@ export class HttpClient {
             async (err: any) => this.handleHttpError(options, err, relativePath, fullUrl)
         );
     }
+    private isExpiredToken403(err: any): boolean {
+        const status = err && err.response ? err.response.status : undefined;
+        if (status !== 403) {
+            return false;
+        }
+
+        const body = err?.response?.body || {};
+        const text =
+            (typeof err?.response?.text === 'string' && err.response.text) ||
+            (typeof body?.message === 'string' && body.message) ||
+            (typeof body?.error_description === 'string' && body.error_description) ||
+            (typeof err?.message === 'string' && err.message) ||
+            '';
+
+        const message = text.toLowerCase();
+        
+        return (
+            message.includes('forbidden') ||
+            (message.includes('token') && (message.includes('expired') || message.includes('invalid')))
+        );
+}
 
     private async handleHttpError(options: InternalRequestOptions, err: any, relativePath: string, fullUrl: string) {
-        const canRetry = options.retry && err && err.response && err.response.unauthorized;
+        const canRetry = options.retry && err && err.response && (err.response.unauthorized ||this.isExpiredToken403(err));
         if (canRetry) {
             this.log.warning('Access token expired, requesting a new token');
 
