@@ -498,26 +498,29 @@ export class HttpClient {
             async (err: any) => this.handleHttpError(options, err, relativePath, fullUrl)
         );
     }
-    private isExpiredToken403(err: any): boolean {
-        const status = err && err.response ? err.response.status : undefined;
-        if (status !== 403) {
-            return false;
-        }
+   private isExpiredToken403(err: any): boolean {
+    if (!err) return false;
 
-        const body = err?.response?.body || {};
-        const text =
-            (typeof err?.response?.text === 'string' && err.response.text) ||
-            (typeof body?.message === 'string' && body.message) ||
-            (typeof body?.error_description === 'string' && body.error_description) ||
-            (typeof err?.message === 'string' && err.message) ||
-            '';
+    // 1. Check status = 403
+    const status = err.response?.status;
+    if (status !== 403) {
+        return false;
+    }
 
-        const message = text.toLowerCase();
-        
-        return (
-            message.includes('forbidden') ||
-            (message.includes('token') && (message.includes('expired') || message.includes('invalid')))
-        );
+    // 2. Extract possible message sources
+    const message =
+        err.httpResponse?.message ||
+        err.message ||       
+        err.response?.body?.message ||
+        err.response?.body?.error_description ||
+        err.response?.text ||
+        "";
+
+    const expected =
+        "user is not authorized to access this resource with an explicit deny in an identity-based policy";
+
+    // MATCH EXACT MESSAGE
+    return message.toLowerCase().includes(expected.toLowerCase());
 }
 
     private async handleHttpError(options: InternalRequestOptions, err: any, relativePath: string, fullUrl: string) {
@@ -538,7 +541,18 @@ export class HttpClient {
             optionsClone.retry = false;
             return this.sendRequest(relativePath, optionsClone);
         } else {
-            const message = `${options.method.toUpperCase()} request failed to ${fullUrl}`;
+            let actualMessage = "";
+
+            if (err) {
+                const msg1 = err.message || "";
+                const msg2 = err.response?.body?.message || "";
+                const msg3 = err.response?.body?.error_description || "";
+                const msg4 = err.response?.text || "";
+
+                actualMessage = `${msg1} ${msg2} ${msg3} ${msg4}`.trim();
+            }
+
+            const message = `${options.method.toUpperCase()} request failed to ${fullUrl}.` + `Actual message: ${actualMessage}`;
             const logMethod = options.suppressWarnings ? 'debug' : 'warning';
             this.log[logMethod](message);
             return Promise.reject(err);
