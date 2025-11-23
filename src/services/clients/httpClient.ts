@@ -498,6 +498,7 @@ export class HttpClient {
             async (err: any) => this.handleHttpError(options, err, relativePath, fullUrl)
         );
     }
+    //Ideally we are expecting 401 but we are getting 403, handling that 403 
    private isExpiredToken403(err: any): boolean {
     if (!err) return false;
 
