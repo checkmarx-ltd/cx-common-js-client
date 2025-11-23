@@ -556,7 +556,7 @@ export class HttpClient {
             const message = `${options.method.toUpperCase()} request failed to ${fullUrl}.` + `Actual message: ${actualMessage}`;
             const logMethod = options.suppressWarnings ? 'debug' : 'warning';
             this.log[logMethod](message);
-            return Promise.reject(err);
+            throw err;
         }
     }
 
