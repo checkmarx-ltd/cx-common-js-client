@@ -190,7 +190,9 @@ export class ScaClient {
             this.stopwatch.start();
             this.log.info("Scan started successfully. Scan ID: " + this.scanId);
         } catch (err) {
-            throw Error("Error creating CxSCA scan. " + err.message);
+            throw Error("Error creating CxSCA scan. " + err.message
+                + " " +err.httpResponse.message
+            );
         }
     }
 
@@ -441,7 +443,7 @@ export class ScaClient {
 
     private async fetchProjectResolvingConfiguration(): Promise<ScaResolvingConfiguration> {
         const guid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c: string) => {
-            const r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+            const r = Math.trunc(Math.random() * 16) , v = c == 'x' ? r : (r & 0x3 | 0x8);
             return v.toString(16);
         });
         this.log.info(`Sending a request to fetch resolving configuration.`);
