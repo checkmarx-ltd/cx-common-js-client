@@ -381,8 +381,7 @@ export class ScaClient {
                 fs.unlinkSync(tempSASTResultFile);
             }
             this.log.debug("Deleting temporary result files of ScaResolver.");
-            fs.rmdirSync(tempDirectory, { recursive: true });
-
+            fs.rmSync(tempDirectory, { recursive: true });
 
         } else {
             throw Error("Error while running sca resolver executable. Exit code:" + exitCode);
