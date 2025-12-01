@@ -192,7 +192,7 @@ export class ScaClient {
             this.stopwatch.start();
             this.log.info("Scan started successfully. Scan ID: " + this.scanId);
         } catch (err) {
-            throw Error(
+            throw new Error(
                 "Error creating CxSCA scan. " +
                 (err?.message || "") +
                 " " +

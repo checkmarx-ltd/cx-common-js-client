@@ -17,7 +17,6 @@ export class SpawnScaResolver {
       let exitCode:number = -100;
       let scaResolverCommand: string;
       let argument: Array<string>;
-      let scanContainers = false;          // whether container scan enabled
       let containerResultPath: string = ""; // path to container result JSON
 
 
@@ -38,7 +37,6 @@ export class SpawnScaResolver {
             i=i+1;
         }
         else if (arg === "--scan-containers") {
-          scanContainers = true;
         }
         else if (arg === "--containers-result-path") {
           containerResultPath = argument[i + 1];
