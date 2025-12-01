@@ -31,17 +31,14 @@ export class SpawnScaResolver {
         {
             scaResolverCommand =scaResolverCommand + " " +pathToResultJSONFile;
             i=i+1;
-        }else if(arg=="--sast-result-path")
+        } else if(arg=="--sast-result-path")
         {
             scaResolverCommand =scaResolverCommand + " " +pathToSASTResultJSONFile;
             i=i+1;
-        }
-        else if (arg === "--scan-containers") {
-        }
-        else if (arg === "--containers-result-path") {
+        } else if (arg === "--containers-result-path") {
           containerResultPath = argument[i + 1];
           scaResolverCommand += " " + containerResultPath;
-          i++;
+          i = i + 1;
         }
       }
 
