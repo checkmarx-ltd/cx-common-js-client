@@ -16,7 +16,9 @@ export class SpawnScaResolver {
      static async runScaResolver(pathToScaResolver:string, scaResolverAddParams: string,pathToResultJSONFile:string, pathToSASTResultJSONFile:string,  log: Logger):Promise<number> {
       let exitCode:number = -100;
       let scaResolverCommand: string;
-      let argument: Array<string>;  
+      let argument: Array<string>;
+      let containerResultPath: string = ""; // path to container result JSON
+
 
       //   Convert path and additional parameters into a single CMD command
       argument = scaResolverAddParams.split(" ");
@@ -29,12 +31,15 @@ export class SpawnScaResolver {
         {
             scaResolverCommand =scaResolverCommand + " " +pathToResultJSONFile;
             i=i+1;
-        }else if(arg=="--sast-result-path")
+        } else if(arg=="--sast-result-path")
         {
             scaResolverCommand =scaResolverCommand + " " +pathToSASTResultJSONFile;
             i=i+1;
-        }        
-
+        } else if (arg === "--containers-result-path") {
+          containerResultPath = argument[i + 1];
+          scaResolverCommand += " " + containerResultPath;
+          i = i + 1;
+        }
       }
 
 
