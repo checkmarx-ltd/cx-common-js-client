@@ -49,6 +49,8 @@ export class ScaClient {
     public static readonly AUTHENTICATION: string = "identity/connect/token";
     public static readonly TEMP_FILE_NAME_TO_SCA_RESOLVER_RESULTS_ZIP: string = "ScaResolverResults";
     public static readonly SCA_RESOLVER_RESULT_FILE_NAME: string = ".cxsca-results.json";
+    public static readonly SCA_CONTAINER_RESULT_FILE_NAME: string = ".container-results.json";
+
 
     private static readonly RISK_MANAGEMENT_API: string = "/risk-management/";
     private static readonly PROJECTS: string = ScaClient.RISK_MANAGEMENT_API + "projects";
@@ -190,8 +192,11 @@ export class ScaClient {
             this.stopwatch.start();
             this.log.info("Scan started successfully. Scan ID: " + this.scanId);
         } catch (err) {
-            throw Error("Error creating CxSCA scan. " + err.message
-                + " " +err.httpResponse.message
+            throw Error(
+                "Error creating CxSCA scan. " +
+                (err?.message || "") +
+                " " +
+                (err?.httpResponse?.message || "")
             );
         }
     }
@@ -308,7 +313,9 @@ export class ScaClient {
 
     private async submitScaResolverEvidenceFile(): Promise<any> {
         let pathToResultJSONFile: string = '';
-        let pathToSASTResultJSONFile: string = '';        
+        let pathToSASTResultJSONFile: string = '';
+        let pathToContainerResultJSONFile: string = '';
+        
 
         let scaResultPathArgName = this.getScaResultPathArgumentName();
 
@@ -316,6 +323,13 @@ export class ScaClient {
             pathToResultJSONFile = this.getScaResolverResultFilePathFromAdditionalParams(this.config.scaResolverAddParameters, scaResultPathArgName);        
         }
         this.log.info("SCA resolver result path configured: " + pathToResultJSONFile);
+        // NEW: read container result json path
+        pathToContainerResultJSONFile = this.getScaResolverResultFilePathFromAdditionalParams(
+            this.config.scaResolverAddParameters,
+            "--containers-result-path"
+        );
+        this.log.info("Container result path configured: " + pathToContainerResultJSONFile);
+
 
         let timeStamp = this.getTimestampFolder();
         pathToResultJSONFile = this.createTimestampBasedPath(pathToResultJSONFile, timeStamp, ScaClient.SCA_RESOLVER_RESULT_FILE_NAME);
@@ -349,6 +363,17 @@ export class ScaClient {
             if (this.checkSastResultPath()) {
                 fs.copyFileSync(pathToSASTResultJSONFile, tempSASTResultFile);
             }
+            // Copy container results file
+            if (pathToContainerResultJSONFile && fs.existsSync(pathToContainerResultJSONFile)) {
+
+                const tempContainerResultFile =
+                    tempDirectory + path.sep + ScaClient.SCA_CONTAINER_RESULT_FILE_NAME;
+
+                fs.copyFileSync(pathToContainerResultJSONFile, tempContainerResultFile);
+
+                this.log.debug("Copied container results file to temporary folder: " + tempContainerResultFile);
+            }
+
             
             await this.zipEvidenceFile(tempDirectory).then(res => {
                 zipFile = res;
@@ -359,7 +384,8 @@ export class ScaClient {
                 fs.unlinkSync(tempSASTResultFile);
             }
             this.log.debug("Deleting temporary result files of ScaResolver.");
-            fs.rmdirSync(tempDirectory);
+            fs.rmdirSync(tempDirectory, { recursive: true });
+
 
         } else {
             throw Error("Error while running sca resolver executable. Exit code:" + exitCode);
