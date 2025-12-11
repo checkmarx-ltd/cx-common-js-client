@@ -121,15 +121,17 @@ export default class Zipper {
         return result;
     }
     private shouldDescendIntoDirectory(relativeDirPath: string): boolean {
+     // SCA case: always allow recursive directories
+     if (this.filenameFiltersAnd.length === 0) {
+        return true;
+    }
     // Normalize to folder-style path with trailing slash so filters like "node_modules/**" match cleanly
-    const normalized = relativeDirPath ? relativeDirPath.replace(/\\/g, "/") + "/" : "";
-
+        let normalized = relativeDirPath.replace(/\\/g, "/");
+        if (normalized && !normalized.endsWith("/")) {
+            normalized += "/";
+        }
     const passesAnd = this.filenameFiltersAnd.every(filter => filter.includes(normalized));
-    const passesOr =
-        this.filenameFiltersOr.length === 0 ||
-        this.filenameFiltersOr.some(filter => filter.includes(normalized));
-
-    const keep = passesAnd && passesOr;
+    const keep = passesAnd;
 
     if (!keep) {
         this.log.debug(`Skip: ${relativeDirPath || "."}(directory)`);
