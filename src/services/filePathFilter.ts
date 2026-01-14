@@ -30,11 +30,44 @@ export class FilePathFilter {
     includes(path: string): boolean {
         const matchesAnyInclusionPattern = micromatch.any(path, this.include, FilePathFilter.fileMatcherOptions);
         const matchesAnyExclusionPattern = micromatch.any(path, this.exclude, FilePathFilter.fileMatcherOptions);
+
+        if (!matchesAnyInclusionPattern) {
+            return false;
+        }
+        if (matchesAnyExclusionPattern) {
+            const hasSpecificInclusionPattern = this.include.some(includePattern => {
+                if (micromatch.isMatch(path, includePattern, FilePathFilter.fileMatcherOptions)) {
+                    const includeSegments = includePattern.split('/').filter(s => s && s !== '**');
+
+                    return this.exclude.some(excludePattern => {
+                        if (micromatch.isMatch(path, excludePattern, FilePathFilter.fileMatcherOptions)) {
+                            const excludeSegments = excludePattern.split('/').filter(s => s && s !== '**');
+                            return includeSegments.length > excludeSegments.length;
+                        }
+                        return false;
+                    });
+                }
+                return false;
+            });
+
+            if (hasSpecificInclusionPattern) {
+                return true;
+            }
+        }
+
         return matchesAnyInclusionPattern && !matchesAnyExclusionPattern;
     }
 
     hasInclude(): boolean {
         return Boolean(this.include.length)
+    }
+
+    getIncludePatterns(): string[] {
+        return [...this.include];
+    }
+
+    getExcludePatterns(): string[] {
+        return [...this.exclude];
     }
 
     private parseFilterPattern(filterPattern: string) {
@@ -64,8 +97,14 @@ export class FilePathFilter {
         const foldersAsFilterPatterns = excludedFolders.split(this.PATTERN_SEPARATOR)
             .map(pattern => pattern.trim())
             .filter(pattern => pattern)
-            // The folder should be excluded when found at any depth.
-            .map(pattern => `**/${pattern}/**`);
+            .map(pattern => {
+                if (pattern.includes('/') || pattern.includes('\\')) {
+                    const normalizedPattern = pattern.replace(/\\/g, '/');
+                    return `${normalizedPattern}/**`;
+                } else {
+                    return `${pattern}/**`;
+                }
+            });
 
         this.exclude.push(...foldersAsFilterPatterns);
     }
