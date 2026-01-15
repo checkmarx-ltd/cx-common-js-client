@@ -14,9 +14,16 @@ export default class Zipper {
 
     private totalAddedFiles = 0;
 
+    private filePathsByName: Map<string, string[]> = new Map();
+
+    // Flag to enable/disable deduplication (disabled by default for backward compatibility)
+    private enableDeduplication: boolean = false;
+
     constructor(private readonly log: Logger,
         private readonly filenameFiltersAnd: FilePathFilter[] = [],
-        private readonly filenameFiltersOr: FilePathFilter[] = []) {
+        private readonly filenameFiltersOr: FilePathFilter[] = [],
+        enableDeduplication: boolean = false) {
+        this.enableDeduplication = enableDeduplication;
     }
 
     private addSingleFileToZip(srcFile: string) {
@@ -35,7 +42,9 @@ export default class Zipper {
 
     zipDirectory(srcDir: string, targetPath: string, fingerprintsFile?: string): Promise<ZipResult> {
         this.totalAddedFiles = 0;
-        this.srcDir = srcDir;        
+        this.srcDir = srcDir;
+        // Reset file tracking for deduplication
+        this.filePathsByName.clear();
         return new Promise<ZipResult>((resolve, reject) => {
             this.archiver = this.createArchiver(reject);
             const zipOutput = this.createOutputStream(targetPath, resolve);
@@ -45,40 +54,35 @@ export default class Zipper {
                 this.addSingleFileToZip(fingerprintsFile);
             }                     
                
-                if (fs.lstatSync(srcDir).isDirectory()) {            
+                if (fs.lstatSync(srcDir).isDirectory()) {
                     this.log.debug('Discovering files in source directory.');
                     // followLinks is set to true to conform to Common Client behavior.
                     const walker = walk(this.srcDir, { followLinks: true });
-                      walker.on('directories', (parentDir: string, dirArray: { name: string }[], nextDir: () => void) => {
-                // Filter out any subdirectory that should be excluded
-                const keptDirs = dirArray.filter(dirInfo => {
-                    const name = dirInfo.name;
-                    // Skip dot entries early 
-                    if (name === '.' || name === '..') {
-                        this.log?.debug?.(`Skip: ${name} (directory)`);
-                        return false;
-                    }
-                    const absoluteDirPath = upath.resolve(parentDir, name);
-                    // Skip symbolic link directories
-                    try {
-                        if (fs.lstatSync(absoluteDirPath).isSymbolicLink()) {
-                            this.log?.debug?.(`Skip: ${absoluteDirPath} (symlink directory)`);
-                            return false;
-                        }
-                    } catch(err) {
-                        this.log.warning(`lstat failed for ${absoluteDirPath}: ${err.message}`);
-                    }
-                    const relativeDirPath = upath.relative(this.srcDir, absoluteDirPath);
-                    // We'll decide to KEEP it only if it passes include/exclude rules
-                    return this.shouldDescendIntoDirectory(relativeDirPath);
-                });
+                    walker.on('directories', (parentDir: string, dirArray: { name: string }[], nextDir: () => void) => {
+                        const keptDirs = dirArray.filter(dirInfo => {
+                            const name = dirInfo.name;
+                           
+                            if (name === '.' || name === '..') {
+                                this.log?.debug?.(`Skip: ${name} (directory)`);
+                                return false;
+                            }
+                            const absoluteDirPath = upath.resolve(parentDir, name);
+                            try {
+                                if (fs.lstatSync(absoluteDirPath).isSymbolicLink()) {
+                                    this.log?.debug?.(`Skip: ${absoluteDirPath} (symlink directory)`);
+                                    return false;
+                                }
+                            } catch (err) {
+                                this.log.warning(`lstat failed for ${absoluteDirPath}: ${err.message}`);
+                            }
+                            const relativeDirPath = upath.relative(this.srcDir, absoluteDirPath);
+                            return this.shouldDescendIntoDirectory(relativeDirPath);
+                        });
+                        dirArray.length = 0;
+                        dirArray.push(...keptDirs);
 
-                // mutate dirArray in-place so walker will only descend into keptDirs
-                dirArray.length = 0;
-                dirArray.push(...keptDirs);
-
-                nextDir();
-            });
+                        nextDir();
+                    });
                     walker.on('file', this.addFileToArchive);
                     walker.on('end', () => {
                         this.log.debug('Finished discovering files in source directory.');
@@ -86,8 +90,8 @@ export default class Zipper {
                     });
                 } else {
                     this.addSingleFileToZip(srcDir);
-                        this.archiver.finalize();
-                }  
+                    this.archiver.finalize();
+                }
         });
     }
 
@@ -121,40 +125,146 @@ export default class Zipper {
         return result;
     }
     private shouldDescendIntoDirectory(relativeDirPath: string): boolean {
-     // SCA case: always allow recursive directories
-     if (this.filenameFiltersAnd.length === 0) {
-        return true;
-    }
-    // Normalize to folder-style path with trailing slash so filters like "node_modules/**" match cleanly
         let normalized = relativeDirPath.replace(/\\/g, "/");
         if (normalized && !normalized.endsWith("/")) {
             normalized += "/";
         }
-    const passesAnd = this.filenameFiltersAnd.every(filter => filter.includes(normalized));
-    const keep = passesAnd;
+        const directoryPassesFilter = this.filenameFiltersAnd.every(filter =>
+            filter.includes(normalized)
+        );
+        const hasSpecificFileInclusionsInDirectory = this.filenameFiltersAnd.some(filter =>
+            this.filterHasSpecificInclusionsInDirectory(filter, normalized)
+        );
 
-    if (!keep) {
-        this.log.debug(`Skip: ${relativeDirPath || "."}(directory)`);
+        const keep = directoryPassesFilter || hasSpecificFileInclusionsInDirectory;
+
+        if (!keep) {
+           
+            const displayPath = normalized.endsWith("/") ? normalized.slice(0, -1) : normalized;
+            this.log.debug(`Skip: ${displayPath || "."} (directory)`);
+        } else if (!directoryPassesFilter && hasSpecificFileInclusionsInDirectory) {
+            const isExplicitlyExcluded = this.filenameFiltersAnd.some(filter => {
+                const excludePatterns = filter.getExcludePatterns();
+                return excludePatterns.some(excludePattern => {
+                    return normalized.startsWith(excludePattern.replace('/**', '/'));
+                });
+            });
+
+            if (isExplicitlyExcluded) {
+                const displayPath = normalized.endsWith("/") ? normalized.slice(0, -1) : normalized;
+                this.log.debug(`Skip: ${displayPath || "."} (directory)`);
+            }
+        }
+
+        return keep;
     }
 
-    return keep;
-}
+    
+    private filterHasSpecificInclusionsInDirectory(filter: FilePathFilter, normalizedDirPath: string): boolean {
+        const includePatterns = filter.getIncludePatterns();
+        const excludePatterns = filter.getExcludePatterns();
+        const isDirectoryExcluded = excludePatterns.some(excludePattern => {
+            return normalizedDirPath.startsWith(excludePattern.replace('/**', '/'));
+        });
+        return includePatterns.some((pattern: string) => {
+           
+            if (pattern.startsWith(normalizedDirPath) && pattern.length > normalizedDirPath.length) {
+                return true;
+            }
+
+            if (pattern.includes('**')) {
+                if (isDirectoryExcluded) {
+                   
+                    const patternPrefix = pattern.substring(0, pattern.indexOf('**'));
+
+                    if (patternPrefix && normalizedDirPath.startsWith(patternPrefix)) {
+                        return true;
+                    }
+
+                    const patternAfterGlob = pattern.substring(pattern.indexOf('**') + 2);
+                    if (patternAfterGlob.startsWith('/')) {
+                        const pathAfterGlob = patternAfterGlob.substring(1);
+                        const dirNameWithoutSlash = normalizedDirPath.endsWith('/')
+                            ? normalizedDirPath.slice(0, -1)
+                            : normalizedDirPath;
+                        if (pathAfterGlob.startsWith(dirNameWithoutSlash + '/') || pathAfterGlob === dirNameWithoutSlash) {
+                            return true;
+                        }
+                    }
+                    const afterGlob = pattern.substring(pattern.indexOf('**') + 2);
+                    const isSpecificPattern = afterGlob &&
+                                             afterGlob !== '/*' &&
+                                             afterGlob !== '/**' &&
+                                             afterGlob.length > 0;
+
+                    if (isSpecificPattern) {
+                        const isRootLevelDir = !normalizedDirPath.includes('/') ||
+                                              (normalizedDirPath.match(/\//g) || []).length === 1;
+
+                        if (isRootLevelDir) {
+                            return true;
+                        }
+                    }
+                    return false;
+                } else {
+                    
+                    return true;
+                }
+            }
+
+            return false;
+        });
+    }
+
+    
+    private shouldAddFileBasedOnLocation(filename: string, relativeFilePath: string, absoluteFilePath: string): boolean {
+        if (!this.enableDeduplication) {
+            return true;
+        }
+
+        if (!this.filePathsByName.has(filename)) {
+            this.filePathsByName.set(filename, []);
+        }
+
+        const existingPaths = this.filePathsByName.get(filename)!;
+
+        const currentDepth = (relativeFilePath.match(/\//g) || []).length;
+
+        for (const existingPath of existingPaths) {
+            const existingDepth = (existingPath.match(/\//g) || []).length;
+
+            if (existingDepth < currentDepth) {
+                this.log.debug(`Skip: ${absoluteFilePath} (duplicate file, preferring shallower location)`);
+                return false;
+            } else if (existingDepth > currentDepth) {
+                continue;
+            }
+        }
+        existingPaths.push(relativeFilePath);
+
+        return true;
+    }
 
     private addFileToArchive = (parentDir: string, fileStats: any, discoverNextFile: () => void) => {
         const absoluteFilePath = upath.resolve(parentDir, fileStats.name);
-        const relativeFilePath = upath.relative(this.srcDir, absoluteFilePath);
+        const relativeFilePath = upath.relative(this.srcDir, absoluteFilePath).replace(/\\/g, '/');
 
         // relativeFilePath is normalized to contain forward slashes independent of the current OS. Examples:
         //      page.cs                             - if page.cs is at the project's root dir
         //      services/internal/myservice.js      - if myservice.js is in a nested dir
-        if (this.filenameFiltersAnd.every(filter => filter.includes(relativeFilePath)) && (!this.filenameFiltersOr.length || this.filenameFiltersOr.some(filter => filter.includes(relativeFilePath)))) {
-            this.log.debug(` Add: ${absoluteFilePath}`);
 
-            const relativeDirInArchive = upath.relative(this.srcDir, parentDir);
-            this.archiver.file(absoluteFilePath, {
-                name: fileStats.name,
-                prefix: relativeDirInArchive
-            });
+        const Allows =
+        this.filenameFiltersAnd.every(filter => filter.includes(relativeFilePath)) && (!this.filenameFiltersOr.length || this.filenameFiltersOr.some(filter => filter.includes(relativeFilePath)));
+        if (Allows) {
+            if (this.shouldAddFileBasedOnLocation(fileStats.name, relativeFilePath, absoluteFilePath)) {
+                this.log.debug(` Add: ${absoluteFilePath}`);
+
+                const relativeDirInArchive = upath.relative(this.srcDir, parentDir);
+                this.archiver.file(absoluteFilePath, {
+                    name: fileStats.name,
+                    prefix: relativeDirInArchive
+                });
+            }
         } else {
             this.log.debug(`Skip: ${absoluteFilePath}`);
         }
