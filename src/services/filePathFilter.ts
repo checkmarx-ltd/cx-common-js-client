@@ -42,7 +42,10 @@ export class FilePathFilter {
                     return this.exclude.some(excludePattern => {
                         if (micromatch.isMatch(path, excludePattern, FilePathFilter.fileMatcherOptions)) {
                             const excludeSegments = excludePattern.split('/').filter(s => s && s !== '**');
-                            return includeSegments.length > excludeSegments.length;
+                            return includeSegments.length > excludeSegments.length ||
+                                   (includeSegments.length === excludeSegments.length &&
+                                    includeSegments.some(s => s.includes('.')) &&
+                                    excludePattern.endsWith('/**'));
                         }
                         return false;
                     });
