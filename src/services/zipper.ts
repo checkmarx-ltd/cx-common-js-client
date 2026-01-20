@@ -139,9 +139,18 @@ export default class Zipper {
         const keep = directoryPassesFilter || hasSpecificFileInclusionsInDirectory;
 
         if (!keep) {
-           
-            const displayPath = normalized.endsWith("/") ? normalized.slice(0, -1) : normalized;
-            this.log.debug(`Skip: ${displayPath || "."} (directory)`);
+            
+            const isInsideExcludedDir = this.filenameFiltersAnd.some(filter => {
+                const excludePatterns = filter.getExcludePatterns();
+                return excludePatterns.some(excludePattern => {
+                    const excludedDirPath = excludePattern.replace('/**', '/');
+                    return normalized.startsWith(excludedDirPath) && normalized !== excludedDirPath;
+                });
+            });
+            if (!isInsideExcludedDir) {
+                const displayPath = normalized.endsWith("/") ? normalized.slice(0, -1) : normalized;
+                this.log.debug(`Skip: ${displayPath || "."} (directory)`);
+            }
         } else if (!directoryPassesFilter && hasSpecificFileInclusionsInDirectory) {
             const isExplicitlyExcluded = this.filenameFiltersAnd.some(filter => {
                 const excludePatterns = filter.getExcludePatterns();
@@ -151,8 +160,18 @@ export default class Zipper {
             });
 
             if (isExplicitlyExcluded) {
-                const displayPath = normalized.endsWith("/") ? normalized.slice(0, -1) : normalized;
-                this.log.debug(`Skip: ${displayPath || "."} (directory)`);
+                const isTopLevelExcludedDir = this.filenameFiltersAnd.some(filter => {
+                    const excludePatterns = filter.getExcludePatterns();
+                    return excludePatterns.some(excludePattern => {
+                        const excludedDirPath = excludePattern.replace('/**', '/');
+                        return normalized === excludedDirPath;
+                    });
+                });
+
+                if (isTopLevelExcludedDir) {
+                    const displayPath = normalized.endsWith("/") ? normalized.slice(0, -1) : normalized;
+                    this.log.debug(`Skip: ${displayPath || "."} (directory)`);
+                }
             }
         }
 
@@ -167,14 +186,12 @@ export default class Zipper {
             return normalizedDirPath.startsWith(excludePattern.replace('/**', '/'));
         });
         return includePatterns.some((pattern: string) => {
-           
             if (pattern.startsWith(normalizedDirPath) && pattern.length > normalizedDirPath.length) {
                 return true;
             }
 
             if (pattern.includes('**')) {
                 if (isDirectoryExcluded) {
-                   
                     const patternPrefix = pattern.substring(0, pattern.indexOf('**'));
 
                     if (patternPrefix && normalizedDirPath.startsWith(patternPrefix)) {
@@ -198,16 +215,10 @@ export default class Zipper {
                                              afterGlob.length > 0;
 
                     if (isSpecificPattern) {
-                        const isRootLevelDir = !normalizedDirPath.includes('/') ||
-                                              (normalizedDirPath.match(/\//g) || []).length === 1;
-
-                        if (isRootLevelDir) {
-                            return true;
-                        }
+                        return true;
                     }
                     return false;
                 } else {
-                    
                     return true;
                 }
             }
@@ -247,6 +258,7 @@ export default class Zipper {
 
     private addFileToArchive = (parentDir: string, fileStats: any, discoverNextFile: () => void) => {
         const absoluteFilePath = upath.resolve(parentDir, fileStats.name);
+        // Convert path to forward slashes for consistent pattern matching across all platforms
         const relativeFilePath = upath.relative(this.srcDir, absoluteFilePath).replace(/\\/g, '/');
 
         // relativeFilePath is normalized to contain forward slashes independent of the current OS. Examples:
@@ -266,7 +278,16 @@ export default class Zipper {
                 });
             }
         } else {
-            this.log.debug(`Skip: ${absoluteFilePath}`);
+            const isInsideExcludedDir = this.filenameFiltersAnd.some(filter => {
+                const excludePatterns = filter.getExcludePatterns();
+                return excludePatterns.some(excludePattern => {
+                    const excludedDirPath = excludePattern.replace('/**', '/');
+                    return relativeFilePath.startsWith(excludedDirPath);
+                });
+            });
+            if (!isInsideExcludedDir) {
+                this.log.debug(`Skip: ${absoluteFilePath}`);
+            }
         }
 
         discoverNextFile();
