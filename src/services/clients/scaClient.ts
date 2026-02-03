@@ -49,7 +49,7 @@ export class ScaClient {
     public static readonly AUTHENTICATION: string = "identity/connect/token";
     public static readonly TEMP_FILE_NAME_TO_SCA_RESOLVER_RESULTS_ZIP: string = "ScaResolverResults";
     public static readonly SCA_RESOLVER_RESULT_FILE_NAME: string = ".cxsca-results.json";
-    public static readonly SCA_CONTAINER_RESULT_FILE_NAME: string = ".container-results.json";
+    public static readonly SCA_CONTAINER_RESULT_FILE_NAME: string = ".cxsca.container-results.json";
 
 
     private static readonly RISK_MANAGEMENT_API: string = "/risk-management/";
