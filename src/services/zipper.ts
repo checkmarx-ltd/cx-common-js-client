@@ -61,7 +61,7 @@ export default class Zipper {
                     walker.on('directories', (parentDir: string, dirArray: { name: string }[], nextDir: () => void) => {
                         const keptDirs = dirArray.filter(dirInfo => {
                             const name = dirInfo.name;
-                           
+
                             if (name === '.' || name === '..') {
                                 this.log?.debug?.(`Skip: ${name} (directory)`);
                                 return false;
@@ -129,6 +129,19 @@ export default class Zipper {
         if (normalized && !normalized.endsWith("/")) {
             normalized += "/";
         }
+        const dirName = normalized.split('/').filter(Boolean).pop();
+
+        const isExcludedByName = this.filenameFiltersAnd.some(filter =>
+            filter.getExcludePatterns().some(pattern => {
+                const excludedDir = pattern
+                    .replace(/\/\*\*$/g, '')
+                    .split('/')
+                    .filter(Boolean)
+                    .pop() || '';           
+                return excludedDir === dirName;
+            })
+        );
+
         const directoryPassesFilter = this.filenameFiltersAnd.every(filter =>
             filter.includes(normalized)
         );
@@ -136,25 +149,35 @@ export default class Zipper {
             this.filterHasSpecificInclusionsInDirectory(filter, normalized)
         );
 
-        const keep = directoryPassesFilter || hasSpecificFileInclusionsInDirectory;
-
-        if (!keep) {
-           
+        if (isExcludedByName) {
             const displayPath = normalized.endsWith("/") ? normalized.slice(0, -1) : normalized;
-            this.log.debug(`Skip: ${displayPath || "."} (directory)`);
-        } else if (!directoryPassesFilter && hasSpecificFileInclusionsInDirectory) {
-            const isExplicitlyExcluded = this.filenameFiltersAnd.some(filter => {
-                const excludePatterns = filter.getExcludePatterns();
-                return excludePatterns.some(excludePattern => {
-                    return normalized.startsWith(excludePattern.replace('/**', '/'));
+            const depth = displayPath.split('/').filter(Boolean).length;
+
+            const hasSpecificFilePatterns = this.filenameFiltersAnd.some(filter => {
+                const includePatterns = filter.getIncludePatterns();
+                return includePatterns.some(pattern => {
+                    return pattern !== '**' && pattern.length > 0;
                 });
             });
 
-            if (isExplicitlyExcluded) {
-                const displayPath = normalized.endsWith("/") ? normalized.slice(0, -1) : normalized;
-                this.log.debug(`Skip: ${displayPath || "."} (directory)`);
+            if (!hasSpecificFilePatterns) {
+                if (depth === 1) {
+                    this.log.debug(`Skip: ${displayPath || "."} (directory)`);
+                } else {
+                    this.log.debug(`Skip: ${displayPath} (nested directory)`);
+                }
+                return false;
             }
+
+            if (depth === 1) {
+                this.log.debug(`Skip: ${displayPath || "."} (directory)`);
+            } else {
+                this.log.debug(`Skip: ${displayPath} (nested directory)`);
+            }
+
         }
+
+        const keep = directoryPassesFilter || hasSpecificFileInclusionsInDirectory;
 
         return keep;
     }
@@ -265,8 +288,6 @@ export default class Zipper {
                     prefix: relativeDirInArchive
                 });
             }
-        } else {
-            this.log.debug(`Skip: ${absoluteFilePath}`);
         }
 
         discoverNextFile();
