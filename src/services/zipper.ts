@@ -133,7 +133,11 @@ export default class Zipper {
 
         const isExcludedByName = this.filenameFiltersAnd.some(filter =>
             filter.getExcludePatterns().some(pattern => {
-                const excludedDir = pattern.replace('/**', '').replace('/', '');
+                const excludedDir = pattern
+                    .replace(/\/\*\*$/g, '')
+                    .split('/')
+                    .filter(Boolean)
+                    .pop() || '';           
                 return excludedDir === dirName;
             })
         );
@@ -157,7 +161,6 @@ export default class Zipper {
             });
 
             if (!hasSpecificFilePatterns) {
-        
                 if (depth === 1) {
                     this.log.debug(`Skip: ${displayPath || "."} (directory)`);
                 } else {
@@ -171,7 +174,7 @@ export default class Zipper {
             } else {
                 this.log.debug(`Skip: ${displayPath} (nested directory)`);
             }
-            
+
         }
 
         const keep = directoryPassesFilter || hasSpecificFileInclusionsInDirectory;
