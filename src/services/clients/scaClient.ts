@@ -325,6 +325,38 @@ export class ScaClient {
             this.config.scaResolverAddParameters,
             "--containers-result-path"
         );
+        const isContainerScanEnabled =
+            this.config.scaResolverAddParameters.includes("--scan-containers");
+
+        if (
+            isContainerScanEnabled &&
+            (!pathToContainerResultJSONFile || pathToContainerResultJSONFile === "")
+        ) {
+            if (!pathToResultJSONFile) {
+                throw new Error(
+                    "Container scanning is enabled but resolver result path (-r / --resolver-result-path) is not provided."
+                );
+            }
+
+            const baseDir =
+                pathToResultJSONFile.substring(
+                    0,
+                    pathToResultJSONFile.lastIndexOf(path.sep)
+                );
+
+            if (baseDir === "" || pathToResultJSONFile.lastIndexOf(path.sep) === -1) {
+                pathToContainerResultJSONFile = "container-results.json";
+            } else {
+                pathToContainerResultJSONFile =
+                    baseDir + path.sep + "container-results.json";
+            }
+
+            this.log.info(
+                "No container result path provided. Using default path: " +
+                pathToContainerResultJSONFile
+            );
+        }
+
         this.log.info("Container result path configured: " + pathToContainerResultJSONFile);
 
 
@@ -332,14 +364,22 @@ export class ScaClient {
         pathToResultJSONFile = this.createTimestampBasedPath(pathToResultJSONFile, timeStamp, ScaClient.SCA_RESOLVER_RESULT_FILE_NAME);
 
         if (this.checkSastResultPath()) {
-            pathToSASTResultJSONFile = this.getScaResolverResultFilePathFromAdditionalParams(this.config.scaResolverAddParameters, "--sast-result-path");                
+            pathToSASTResultJSONFile = this.getScaResolverResultFilePathFromAdditionalParams(this.config.scaResolverAddParameters, "--sast-result-path");
             this.log.info("SAST result path location configured: " + pathToSASTResultJSONFile);
             pathToSASTResultJSONFile = this.createTimestampBasedPath(pathToSASTResultJSONFile, timeStamp, ScaClient.SAST_RESOLVER_RESULT_FILE_NAME);
         }
+        if (pathToContainerResultJSONFile) {
+            pathToContainerResultJSONFile = this.createTimestampBasedPath(
+                pathToContainerResultJSONFile,
+                timeStamp,
+                ScaClient.SCA_CONTAINER_RESULT_FILE_NAME
+            );
+            this.log.debug("Container result path after timestamp processing: " + pathToContainerResultJSONFile);
+        }
 
         let exitCode;
-        this.log.info("Launching dependency resolution by ScaResolver. ScaResolver logs can be viewed in debug level logs of the pipeline."); 
-        await SpawnScaResolver.runScaResolver(this.config.pathToScaResolver, this.config.scaResolverAddParameters, pathToResultJSONFile, pathToSASTResultJSONFile, this.log).then(res => {
+        this.log.info("Launching dependency resolution by ScaResolver. ScaResolver logs can be viewed in debug level logs of the pipeline.");
+        await SpawnScaResolver.runScaResolver(this.config.pathToScaResolver, this.config.scaResolverAddParameters, pathToResultJSONFile, pathToSASTResultJSONFile, pathToContainerResultJSONFile, this.log).then(res => {
             exitCode = res;
         })
         let zipFile: string = '';
@@ -360,8 +400,20 @@ export class ScaClient {
             if (this.checkSastResultPath()) {
                 fs.copyFileSync(pathToSASTResultJSONFile, tempSASTResultFile);
             }
-            // Copy container results file
-            if (pathToContainerResultJSONFile && fs.existsSync(pathToContainerResultJSONFile)) {
+
+            if (isContainerScanEnabled) {
+                if (!pathToContainerResultJSONFile) {
+                    throw new Error(
+                        "Container scanning is enabled but no container result path configured."
+                    );
+                }
+
+                if (!fs.existsSync(pathToContainerResultJSONFile)) {
+                    throw new Error(
+                        `Container scanning is enabled but container result file not found at: ${pathToContainerResultJSONFile}. ` +
+                        `Please ensure ScaResolver successfully generated the container results file.`
+                    );
+                }
 
                 const tempContainerResultFile =
                     tempDirectory + path.sep + ScaClient.SCA_CONTAINER_RESULT_FILE_NAME;
@@ -371,14 +423,20 @@ export class ScaClient {
                 this.log.debug("Copied container results file to temporary folder: " + tempContainerResultFile);
             }
 
-            
+
             await this.zipEvidenceFile(tempDirectory).then(res => {
                 zipFile = res;
             })
-           
+
             fs.unlinkSync(tempResultFile);
             if (this.checkSastResultPath()) {
                 fs.unlinkSync(tempSASTResultFile);
+            }
+            if (isContainerScanEnabled) {
+                const tempContainerResultFile = tempDirectory + path.sep + ScaClient.SCA_CONTAINER_RESULT_FILE_NAME;
+                if (fs.existsSync(tempContainerResultFile)) {
+                    fs.unlinkSync(tempContainerResultFile);
+                }
             }
             this.log.debug("Deleting temporary result files of ScaResolver.");
             fs.rmSync(tempDirectory, { recursive: true });
