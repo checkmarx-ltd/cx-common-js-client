@@ -125,31 +125,6 @@ export class CxClient {
             }
 
             const systemVersion = versionInfo.version;
-            if (!systemVersion) {
-                this.log.info('System version not available.');
-            } else {
-                    // Compare versions (>= 9.6.2)
-                    const isVersionSupported = (() => {
-                        const current = systemVersion.split('.').map(Number);
-                        const minimum = [9, 6, 2];
-                        const maxLength = Math.max(current.length, minimum.length);
-
-                        for (let i = 0; i < maxLength; i++) {
-                            const c = current[i] ?? 0;
-                            const m = minimum[i] ?? 0;
-            
-                            if (c > m) return true;
-                            if (c < m) return false;
-                        }
-                        return true;
-                    })();
-
-                    if (!isVersionSupported && engineConfigId == 6) {
-                        throw new Error(
-                            `Version ${systemVersion} does not support engine configuration: Fast Scan (ID: ${engineConfigId}).`
-                        );
-                    }
-            }
 
             // Fetch engine configurations
             const configs: engineConfiguration[] =
@@ -170,6 +145,32 @@ export class CxClient {
                 throw new Error(
                     `Engine configuration ID ${engineConfigId} not found.`
                 ); 
+            }
+
+            if (!systemVersion) {
+                this.log.info('System version not available.');
+            } else {
+                    // Compare versions (>= 9.6.2)
+                    const isVersionSupported = (() => {
+                        const current = systemVersion.split('.').map(Number);
+                        const minimum = [9, 6, 2];
+                        const maxLength = Math.max(current.length, minimum.length);
+
+                        for (let i = 0; i < maxLength; i++) {
+                            const c = current[i] ?? 0;
+                            const m = minimum[i] ?? 0;
+            
+                            if (c > m) return true;
+                            if (c < m) return false;
+                        }
+                        return true;
+                    })();
+
+                    if (!isVersionSupported && matched?.name === "Fast Scan") {
+                        throw new Error(
+                            `Version ${systemVersion} does not support engine configuration: Fast Scan (ID: ${engineConfigId}).`
+                        );
+                    }
             }
 
             // Success
