@@ -500,7 +500,7 @@ export class HttpClient {
     }
 
     private async handleHttpError(options: InternalRequestOptions, err: any, relativePath: string, fullUrl: string) {
-        const canRetry = options.retry && err && err.response && err.response.unauthorized;
+        const canRetry = options.retry && err && err.response && (err.response.unauthorized || err.response.status === 403);
         if (canRetry) {
             this.log.warning('Access token expired, requesting a new token');
 
@@ -517,10 +517,21 @@ export class HttpClient {
             optionsClone.retry = false;
             return this.sendRequest(relativePath, optionsClone);
         } else {
-            const message = `${options.method.toUpperCase()} request failed to ${fullUrl}`;
+             let actualMessage = "";
+
+            if (err) {
+                const msg1 = err.message || "";
+                const msg2 = err.response?.body?.message || "";
+                const msg3 = err.response?.body?.error_description || "";
+                const msg4 = err.response?.text || "";
+
+                actualMessage = `${msg1} ${msg2} ${msg3} ${msg4}`.trim();
+            }
+            
+            const message = `${options.method.toUpperCase()} request failed to ${fullUrl}.` + `Actual message: ${actualMessage}`;
             const logMethod = options.suppressWarnings ? 'debug' : 'warning';
             this.log[logMethod](message);
-            return Promise.reject(err);
+            throw err;
         }
     }
 
