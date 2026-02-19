@@ -11,9 +11,13 @@ export class SpawnScaResolver {
 	 * This method executes
 	 * @param pathToScaResolver - Path to SCA Resolver executable
 	 * @param scaResolverAddParams - Additional parameters for SCA resolver
+   * @param pathToResultJSONFile - Path to SCA resolver result JSON file
+	 * @param pathToSASTResultJSONFile - Path to SAST result JSON file
+	 * @param pathToContainerResultJSONFile - Path to container result JSON file
+	 * @param log - Logger instance
 	 * @return
 	 */
-     static async runScaResolver(pathToScaResolver:string, scaResolverAddParams: string,pathToResultJSONFile:string, pathToSASTResultJSONFile:string,  log: Logger):Promise<number> {
+     static async runScaResolver(pathToScaResolver:string, scaResolverAddParams: string,pathToResultJSONFile:string, pathToSASTResultJSONFile:string, pathToContainerResultJSONFile:string, log: Logger):Promise<number> {
       let exitCode:number = -100;
       let scaResolverCommand: string;
       let argument: Array<string>;  
@@ -33,8 +37,16 @@ export class SpawnScaResolver {
         {
             scaResolverCommand =scaResolverCommand + " " +pathToSASTResultJSONFile;
             i=i+1;
-        }        
+        } else if (arg === "--containers-result-path") {
+           // Use the processed container result path passed from scaClient
+          scaResolverCommand += " " + pathToContainerResultJSONFile;
+          i = i + 1;
+        }       
 
+      }
+
+      if (pathToContainerResultJSONFile && !scaResolverAddParams.includes("--containers-result-path")) {
+          scaResolverCommand += " --containers-result-path " + pathToContainerResultJSONFile;
       }
 
 
