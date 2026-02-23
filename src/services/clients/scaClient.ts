@@ -191,8 +191,30 @@ export class ScaClient {
             this.stopwatch.start();
             this.log.info("Scan started successfully. Scan ID: " + this.scanId);
         } catch (err) {
-            throw Error("Error creating CxSCA scan. " + err.message);
+            throw Error("Error creating CxSCA scan. " + this.getErrorMessage(err));
         }
+    }
+
+    private getErrorMessage(err: any): string {
+        if (!err) {
+            return "Unknown error";
+        }
+
+        const messageCandidates = [
+            err.message,
+            err.httpResponse?.message,
+            err.response?.body?.message,
+            err.response?.body?.error_description,
+            err.response?.text
+        ];
+
+        for (const candidate of messageCandidates) {
+            if (typeof candidate === "string" && candidate.trim().length > 0) {
+                return candidate.trim();
+            }
+        }
+
+        return "Unknown error";
     }
 
     private async submitSourceFromRemoteRepo(): Promise<any> {
@@ -297,7 +319,7 @@ export class ScaClient {
     *  3) Execute initiateScan method to generate SCA scan.
     *  4) If absolute file is specified for -r or --sast-result-path or both, files will be created at respective location
          If directory is specified for -r or --sast-result-path or both, files will be created in respective folder under a timestamp-based folder.
-	     In all cases above and any other variations, files will be copied to ‘tmp’ folder that will be created under the directory used for -r flag . ‘tmp’ folder will be removed as soon as zip gets created. Debug logs added to indicate file copying and deletion.
+	     In all cases above and any other variations, files will be copied to 'tmp' folder that will be created under the directory used for -r flag. 'tmp' folder will be removed as soon as zip gets created. Debug logs added to indicate file copying and deletion.
 	     In all cases where -r is passed, its long switch --resolver-result-path option can also be used
 
     * @param scaConfig - AST Sca config object
@@ -712,7 +734,7 @@ The Build Failed for the Following Reasons:
             return result;
         }
         catch (err) {
-            throw Error("Error retrieving CxSCA scan results. " + err.message);
+            throw Error("Error retrieving CxSCA scan results. " + this.getErrorMessage(err));
         }
     }
 
@@ -940,7 +962,7 @@ The Build Failed for the Following Reasons:
             };
             await this.httpClient.putRequest(path, request);
         } catch (err) {
-            this.log.error("Error occurred while updating project tags: " + err.message);
+            this.log.error("Error occurred while updating project tags: " + this.getErrorMessage(err));
         }
     }
 
