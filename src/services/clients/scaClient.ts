@@ -322,6 +322,10 @@ export class ScaClient {
             this.config.scaResolverAddParameters,
             "--containers-result-path"
         );
+
+    if (pathToContainerResultJSONFile === "--containers-result-path") {
+            pathToContainerResultJSONFile = "";
+        }
         
         const isContainerScanEnabled =
             this.config.scaResolverAddParameters.includes("--scan-containers");
