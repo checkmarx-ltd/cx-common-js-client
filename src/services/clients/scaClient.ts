@@ -322,7 +322,6 @@ export class ScaClient {
             this.config.scaResolverAddParameters,
             "--containers-result-path"
         );
-        
         const isContainerScanEnabled =
             this.config.scaResolverAddParameters.includes("--scan-containers");
 
@@ -356,9 +355,9 @@ export class ScaClient {
 
         }
 
-
-        this.log.info("Container result path configured: " + pathToContainerResultJSONFile);
-
+        if (pathToContainerResultJSONFile) {
+            this.log.info("Container result path configured: " + pathToContainerResultJSONFile);
+        }
 
         let timeStamp = this.getTimestampFolder();
         pathToResultJSONFile = this.createTimestampBasedPath(pathToResultJSONFile, timeStamp, ScaClient.SCA_RESOLVER_RESULT_FILE_NAME);
