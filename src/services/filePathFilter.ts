@@ -37,6 +37,18 @@ export class FilePathFilter {
         return Boolean(this.include.length)
     }
 
+    /**
+     * Check if a directory path should be completely excluded from traversal.
+     * This is used for performance optimization to skip entire directories.
+     * Returns true if the directory matches an exclusion pattern that would exclude ALL its contents.
+     */
+    isDirectoryExcluded(dirPath: string): boolean {
+        // Check if this directory path matches any exclusion pattern
+        // We append /** to test if all contents would be excluded
+        const dirPattern = dirPath + '/**';
+        return micromatch.any(dirPattern, this.exclude, FilePathFilter.fileMatcherOptions);
+    }
+
     private parseFilterPattern(filterPattern: string) {
         // Distribute the patterns from the input string into inclusion or exclusion arrays.
         filterPattern.split(this.PATTERN_SEPARATOR)

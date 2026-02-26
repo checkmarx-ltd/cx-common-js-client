@@ -49,6 +49,10 @@ export default class Zipper {
                     this.log.debug('Discovering files in source directory.');
                     // followLinks is set to true to conform to Common Client behavior.
                     const walker = walk(this.srcDir, { followLinks: true });
+                    
+                    // Performance optimization: Skip excluded directories entirely
+                    walker.on('directories', this.skipExcludedDirectories);
+                    
                     walker.on('file', this.addFileToArchive);
                     walker.on('end', () => {
                         this.log.debug('Finished discovering files in source directory.');
@@ -90,6 +94,45 @@ export default class Zipper {
         });
         return result;
     }
+
+    private skipExcludedDirectories = (parentDir: string, dirs: any[], discoverNextDir: () => void) => {
+        // Filter directories in-place by checking each against the filters
+        for (let i = dirs.length - 1; i >= 0; i--) {
+            const dirStats = dirs[i];
+            const absoluteDirPath = upath.resolve(parentDir, dirStats.name);
+            const relativeDirPath = upath.relative(this.srcDir, absoluteDirPath);
+            
+            // Check if this directory is explicitly excluded by checking if the directory path
+            // itself matches an exclusion pattern (like **/node_modules/** or **/bin/**)
+            let isExcluded = false;
+            
+            // Check all AND filters - if ANY filter explicitly excludes this directory, skip it
+            for (const filter of this.filenameFiltersAnd) {
+                if (filter.isDirectoryExcluded(relativeDirPath)) {
+                    isExcluded = true;
+                    break;
+                }
+            }
+            
+            // If not excluded by AND filters, check OR filters
+            if (!isExcluded && this.filenameFiltersOr.length > 0) {
+                // For OR filters, skip directory only if ALL OR filters would exclude it
+                const excludedByAllOrFilters = this.filenameFiltersOr.every(filter => 
+                    filter.isDirectoryExcluded(relativeDirPath)
+                );
+                if (excludedByAllOrFilters) {
+                    isExcluded = true;
+                }
+            }
+            
+            if (isExcluded) {
+                this.log.debug(`Skip directory: ${absoluteDirPath}`);
+                dirs.splice(i, 1);  // Remove this directory from traversal
+            }
+        }
+        
+        discoverNextDir();
+    };
 
     private addFileToArchive = (parentDir: string, fileStats: any, discoverNextFile: () => void) => {
         const absoluteFilePath = upath.resolve(parentDir, fileStats.name);
