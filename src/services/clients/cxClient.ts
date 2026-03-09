@@ -813,7 +813,7 @@ export class CxClient {
     private async initializeEngineConfig(): Promise<void> {
         
         if (!this.sastConfig.engineConfigurationId) {
-            this.sastConfig.engineConfigurationId = 1;
+            this.sastConfig.engineConfigurationId = 0;
             return;
         }
 
