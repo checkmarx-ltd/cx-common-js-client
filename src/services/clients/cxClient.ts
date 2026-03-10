@@ -865,7 +865,7 @@ export class CxClient {
         {
             this.engineConfigurationId = this.sastConfig.engineConfigurationId;
         }else{
-            this.log.info("Engine Configuration ID is not configured, Using default.");
+            this.log.info("Using project default engine configuration.");
         }
 
         if (this.config.projectId) {
