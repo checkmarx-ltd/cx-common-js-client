@@ -51,7 +51,6 @@ export class ScaClient {
     public static readonly SCA_RESOLVER_RESULT_FILE_NAME: string = ".cxsca-results.json";
     public static readonly SCA_CONTAINER_RESULT_FILE_NAME: string = ".cxsca-container-results.json";
 
-
     private static readonly RISK_MANAGEMENT_API: string = "/risk-management/";
     private static readonly PROJECTS: string = ScaClient.RISK_MANAGEMENT_API + "projects";
     private static readonly SUMMARY_REPORT: string = ScaClient.RISK_MANAGEMENT_API + "riskReports/%s/summary";
@@ -192,10 +191,30 @@ export class ScaClient {
             this.stopwatch.start();
             this.log.info("Scan started successfully. Scan ID: " + this.scanId);
         } catch (err) {
-              throw Error("Error creating CxSCA scan. " + err.message
-                + " " +err.httpResponse.message
-            );
+            throw Error("Error creating CxSCA scan. " + this.getErrorMessage(err));
         }
+    }
+
+    private getErrorMessage(err: any): string {
+        if (!err) {
+            return "Unknown error";
+        }
+
+        const messageCandidates = [
+            err.message,
+            err.httpResponse?.message,
+            err.response?.body?.message,
+            err.response?.body?.error_description,
+            err.response?.text
+        ];
+
+        for (const candidate of messageCandidates) {
+            if (typeof candidate === "string" && candidate.trim().length > 0) {
+                return candidate.trim();
+            }
+        }
+
+        return "Unknown error";
     }
 
     private async submitSourceFromRemoteRepo(): Promise<any> {
@@ -313,20 +332,57 @@ export class ScaClient {
         let pathToSASTResultJSONFile: string = '';
         let pathToContainerResultJSONFile: string = '';
         
-
         let scaResultPathArgName = this.getScaResultPathArgumentName();
 
         if(scaResultPathArgName != "") {
             pathToResultJSONFile = this.getScaResolverResultFilePathFromAdditionalParams(this.config.scaResolverAddParameters, scaResultPathArgName);        
         }
         this.log.info("SCA resolver result path configured: " + pathToResultJSONFile);
+        
         // NEW: read container result json path
         pathToContainerResultJSONFile = this.getScaResolverResultFilePathFromAdditionalParams(
             this.config.scaResolverAddParameters,
             "--containers-result-path"
         );
-        this.log.info("Container result path configured: " + pathToContainerResultJSONFile);
+         if (pathToContainerResultJSONFile === "--containers-result-path") {
+            pathToContainerResultJSONFile = "";
+        }
+        const isContainerScanEnabled =
+            this.config.scaResolverAddParameters.includes("--scan-containers");
 
+             if (
+            isContainerScanEnabled &&
+            (!pathToContainerResultJSONFile || pathToContainerResultJSONFile === "")
+        ) {
+            if (!pathToResultJSONFile) {
+                throw new Error(
+                    "Container scanning is enabled but resolver result path (-r / --resolver-result-path) is not provided."
+                );
+            }
+
+            const baseDir =
+                pathToResultJSONFile.substring(
+                    0,
+                    pathToResultJSONFile.lastIndexOf(path.sep)
+                );
+
+                if (baseDir === "" || pathToResultJSONFile.lastIndexOf(path.sep) === -1) {
+                pathToContainerResultJSONFile = "container-results.json";
+            } else {
+                pathToContainerResultJSONFile =
+                    baseDir + path.sep + "container-results.json";
+            }
+
+            this.log.info(
+                "No container result path provided. Using default path: " +
+                pathToContainerResultJSONFile
+            );
+
+        }
+
+         if (pathToContainerResultJSONFile) {
+        this.log.info("Container result path configured: " + pathToContainerResultJSONFile);
+            }
 
         let timeStamp = this.getTimestampFolder();
         pathToResultJSONFile = this.createTimestampBasedPath(pathToResultJSONFile, timeStamp, ScaClient.SCA_RESOLVER_RESULT_FILE_NAME);
@@ -336,16 +392,45 @@ export class ScaClient {
             this.log.info("SAST result path location configured: " + pathToSASTResultJSONFile);
             pathToSASTResultJSONFile = this.createTimestampBasedPath(pathToSASTResultJSONFile, timeStamp, ScaClient.SAST_RESOLVER_RESULT_FILE_NAME);
         }
+        if (pathToContainerResultJSONFile) {
+            pathToContainerResultJSONFile = this.createTimestampBasedPath(
+                pathToContainerResultJSONFile,
+                timeStamp,
+                ScaClient.SCA_CONTAINER_RESULT_FILE_NAME
+            );
+            this.log.debug("Container result path after timestamp processing: " + pathToContainerResultJSONFile);
+        }
 
         let exitCode;
         this.log.info("Launching dependency resolution by ScaResolver. ScaResolver logs can be viewed in debug level logs of the pipeline."); 
-        await SpawnScaResolver.runScaResolver(this.config.pathToScaResolver, this.config.scaResolverAddParameters, pathToResultJSONFile, pathToSASTResultJSONFile, this.log).then(res => {
+        await SpawnScaResolver.runScaResolver(this.config.pathToScaResolver, this.config.scaResolverAddParameters, pathToResultJSONFile, pathToSASTResultJSONFile, pathToContainerResultJSONFile, this.log).then(res => {
             exitCode = res;
         })
         let zipFile: string = '';
         if (exitCode == 0) {
+             zipFile = await this.copyResolverResultsToZipAndCleanup(
+                pathToResultJSONFile,
+                pathToSASTResultJSONFile,
+                pathToContainerResultJSONFile,
+                isContainerScanEnabled
+            );
+             } else {
+            throw Error("Error while running sca resolver executable. Exit code:" + exitCode);
+        }
+        this.log.info('Uploading the zipped data...');
+        const uploadedArchiveUrl: string = await this.getSourceUploadUrl();
+        await this.uploadToAWS(uploadedArchiveUrl, zipFile);
+        await this.deleteZip(zipFile);
+        return this.sendStartScanRequest(SourceLocationType.LOCAL_DIRECTORY, uploadedArchiveUrl);
+    }
+
+    private async copyResolverResultsToZipAndCleanup(
+        pathToResultJSONFile: string,
+        pathToSASTResultJSONFile: string,
+        pathToContainerResultJSONFile: string,
+        isContainerScanEnabled: boolean
+    ): Promise<string> {
             this.log.info("Dependency resolution completed."); 
-            
             let parentDir = pathToResultJSONFile.substring(0, pathToResultJSONFile.lastIndexOf(path.sep));  
             let tempDirectory = parentDir +  path.sep + "tmp";
             if (!fs.existsSync(tempDirectory)){
@@ -360,9 +445,21 @@ export class ScaClient {
             if (this.checkSastResultPath()) {
                 fs.copyFileSync(pathToSASTResultJSONFile, tempSASTResultFile);
             }
-            // Copy container results file
-            if (pathToContainerResultJSONFile && fs.existsSync(pathToContainerResultJSONFile)) {
 
+        if (isContainerScanEnabled) {
+            if (!pathToContainerResultJSONFile) {
+                throw new Error(
+                    "Container scanning is enabled but no container result path configured."
+                );
+            }
+
+            if (!fs.existsSync(pathToContainerResultJSONFile)) {
+                throw new Error(
+                    `Container scanning is enabled but container result file not found at: ${pathToContainerResultJSONFile}. ` +
+                    `Please ensure ScaResolver successfully generated the container results file.`
+                );
+            }
+            
                 const tempContainerResultFile =
                     tempDirectory + path.sep + ScaClient.SCA_CONTAINER_RESULT_FILE_NAME;
 
@@ -371,7 +468,7 @@ export class ScaClient {
                 this.log.debug("Copied container results file to temporary folder: " + tempContainerResultFile);
             }
 
-            
+            let zipFile: string = '';
             await this.zipEvidenceFile(tempDirectory).then(res => {
                 zipFile = res;
             })
@@ -380,19 +477,18 @@ export class ScaClient {
             if (this.checkSastResultPath()) {
                 fs.unlinkSync(tempSASTResultFile);
             }
+            if (isContainerScanEnabled) {
+            const tempContainerResultFile = tempDirectory + path.sep + ScaClient.SCA_CONTAINER_RESULT_FILE_NAME;
+            if (fs.existsSync(tempContainerResultFile)) {
+                fs.unlinkSync(tempContainerResultFile);
+            }
+            }
             this.log.debug("Deleting temporary result files of ScaResolver.");
             fs.rmSync(tempDirectory, { recursive: true });
 
-        } else {
-            throw Error("Error while running sca resolver executable. Exit code:" + exitCode);
+            return zipFile;
         }
-        this.log.info('Uploading the zipped data...');
-        const uploadedArchiveUrl: string = await this.getSourceUploadUrl();
-        await this.uploadToAWS(uploadedArchiveUrl, zipFile);
-        await this.deleteZip(zipFile);
-        return this.sendStartScanRequest(SourceLocationType.LOCAL_DIRECTORY, uploadedArchiveUrl);
-    }
-    async zipEvidenceFile(resultFilePath: string): Promise<string> {
+        async zipEvidenceFile(resultFilePath: string): Promise<string> {
         const tempFilename = tmpNameSync({ prefix: ScaClient.TEMP_FILE_NAME_TO_SCA_RESOLVER_RESULTS_ZIP, postfix: '.zip' });
         this.log.debug(`Zipping source code at ${resultFilePath} into file ${tempFilename}`);
         const zipper = new Zipper(this.log);
@@ -465,7 +561,7 @@ export class ScaClient {
 
     private async fetchProjectResolvingConfiguration(): Promise<ScaResolvingConfiguration> {
         const guid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c: string) => {
-            const r = Math.trunc(Math.random() * 16) , v = c == 'x' ? r : (r & 0x3 | 0x8);
+            const r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
             return v.toString(16);
         });
         this.log.info(`Sending a request to fetch resolving configuration.`);
@@ -655,7 +751,7 @@ The Build Failed for the Following Reasons:
             return result;
         }
         catch (err) {
-            throw Error("Error retrieving CxSCA scan results. " + err.message);
+            throw Error("Error retrieving CxSCA scan results. " + this.getErrorMessage(err));
         }
     }
 
@@ -883,7 +979,7 @@ The Build Failed for the Following Reasons:
             };
             await this.httpClient.putRequest(path, request);
         } catch (err) {
-            this.log.error("Error occurred while updating project tags: " + err.message);
+            this.log.error("Error occurred while updating project tags: " + this.getErrorMessage(err));
         }
     }
 

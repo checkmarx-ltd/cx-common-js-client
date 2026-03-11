@@ -498,34 +498,47 @@ export class HttpClient {
             async (err: any) => this.handleHttpError(options, err, relativePath, fullUrl)
         );
     }
-    //Ideally we are expecting 401 but we are getting 403, handling that 403 
-   private isExpiredToken403(err: any): boolean {
-    if (!err) return false;
+    private getErrorMessage(err: any): string {
+        if (!err) {
+            return "";
+        }
 
-    // 1. Check status = 403
-    const status = err.response?.status;
-    if (status !== 403) {
-        return false;
+        const messageCandidates = [
+            err.httpResponse?.message,
+            err.response?.body?.message,
+            err.response?.body?.error_description,
+            err.response?.text,
+            err.message
+        ];
+
+        for (const candidate of messageCandidates) {
+            if (typeof candidate === "string" && candidate.trim().length > 0) {
+                return candidate.trim();
+            }
+        }
+
+        return "";
     }
 
-    // 2. Extract possible message sources
-    const message =
-        err.httpResponse?.message ||
-        err.message ||       
-        err.response?.body?.message ||
-        err.response?.body?.error_description ||
-        err.response?.text ||
-        "";
+    private isExpiredToken403(err: any): boolean {
+        if (!err) {
+            return false;
+        }
 
-    const expected =
-        "user is not authorized to access this resource with an explicit deny in an identity-based policy";
+        const status = err.response?.status;
+        if (status !== 403) {
+            return false;
+        }
 
-    // MATCH EXACT MESSAGE
-    return message.toLowerCase().includes(expected.toLowerCase());
-}
+        const message = this.getErrorMessage(err).toLowerCase();
+        const expected =
+            "user is not authorized to access this resource with an explicit deny in an identity-based policy";
+        return message.includes(expected);
+    }
 
     private async handleHttpError(options: InternalRequestOptions, err: any, relativePath: string, fullUrl: string) {
-        const canRetry = options.retry && err && err.response && (err.response.unauthorized ||this.isExpiredToken403(err));
+        const status = err?.response?.status;
+        const canRetry = options.retry && (status === 401 || this.isExpiredToken403(err));
         if (canRetry) {
             this.log.warning('Access token expired, requesting a new token');
 
@@ -542,16 +555,7 @@ export class HttpClient {
             optionsClone.retry = false;
             return this.sendRequest(relativePath, optionsClone);
         } else {
-            let actualMessage = "";
-
-            if (err) {
-                const msg1 = err.message || "";
-                const msg2 = err.response?.body?.message || "";
-                const msg3 = err.response?.body?.error_description || "";
-                const msg4 = err.response?.text || "";
-
-                actualMessage = `${msg1} ${msg2} ${msg3} ${msg4}`.trim();
-            }
+            const actualMessage = this.getErrorMessage(err);
 
             const message = `${options.method.toUpperCase()} request failed to ${fullUrl}.` + `Actual message: ${actualMessage}`;
             const logMethod = options.suppressWarnings ? 'debug' : 'warning';
