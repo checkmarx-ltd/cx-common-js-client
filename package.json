@@ -70,5 +70,10 @@
     "mocha": "^9.0.2",
     "ts-node": "^8.5.4",
     "typescript": "^4.5.4"
-  }
+  },
+  "overrides": {
+    "pac-resolver": "^5.0.1",
+    "degenerator": "^3.0.4",
+    "braces": "^3.0.3"
+}
 }
