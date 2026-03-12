@@ -74,6 +74,8 @@
   "overrides": {
     "pac-resolver": "^5.0.1",
     "degenerator": "^3.0.4",
-    "braces": "^3.0.3"
+    "braces": "^3.0.3",
+    "minimatch": "4.2.5",
+    "serialize-javascript": "6.0.2"
   }
 }
