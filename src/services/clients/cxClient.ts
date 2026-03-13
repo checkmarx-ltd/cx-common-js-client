@@ -23,7 +23,6 @@ import { NewVulnerabilitiesThresholdError } from "../../dto/newVulnerabilitiesTh
 import { CustomFields } from "../../dto/api/customFields";
 const fs = require('fs');
 import { engineConfiguration } from "../../dto/api/engineConfiguration";
-import { engineConfigurationConstants } from "../../dto/api/engineConfigurationConstants";
 
 /**
  * High-level CX API client that uses specialized clients internally.
@@ -114,21 +113,81 @@ export class CxClient {
         return result;
     }
 
-    private async getEngineConfigurationId(engineConfigurationName :string) : Promise<number> {
-        let engineConfigId : number= 0;
+    private async getEngineConfigurationId(engineConfigId: number): Promise<number> {
         try {
-            const engineConfigurationDetails : engineConfiguration[] = await this.httpClient.getRequest('sast/engineConfigurations', { suppressWarnings: true });
-            if (engineConfigurationDetails && engineConfigurationDetails.length) 
-            {
-                engineConfigId = engineConfigurationDetails.find(conf => conf.name === engineConfigurationName)?.id ?? 0;
+            const versionInfo = await this.getVersionInfo();
+            // Handle legacy fallback ("under9")
+            if (!versionInfo || typeof versionInfo === 'string') {
+                throw new Error(
+                    `The Build Failed : Unsupported server version [${versionInfo}].`
+                );
             }
-        } catch (err) {
+
+            const systemVersion = versionInfo.version;
+            if (systemVersion) {
+                // Compare versions (>= 9.6.2)
+                const isVersionSupported = (() => {
+                    const current = systemVersion.split('.').map(Number);
+                    const minimum = [9, 6, 2];
+                    const maxLength = Math.max(current.length, minimum.length);
+
+                    for (let i = 0; i < maxLength; i++) {
+                        const c = current[i] ?? 0;
+                        const m = minimum[i] ?? 0;
+
+                        if (c > m) return true;
+                        if (c < m) return false;
+                    }
+                    return true;
+                })();
+
+
+                if (!isVersionSupported && engineConfigId == 6) {
+                    throw new Error(
+                        `Version ${systemVersion} does not support engine configuration: Fast Scan (ID: ${engineConfigId}).`
+                    );
+                }
+            }else {
+                    this.log.info('System version not available.');
+                }
+
+            // Fetch engine configurations
+            const configs: engineConfiguration[] =
+                await this.httpClient.getRequest(
+                    'sast/engineConfigurations',
+                    { suppressinfoings: true }
+                );
+
+            if (!configs?.length) {
+                throw new Error(
+                    'No engine configurations returned.'
+                )
+            }
+
+            // Validate requested ID exists
+            const matched = configs.find(conf => conf.id === engineConfigId);
+            if (!matched) {
+                throw new Error(
+                    `Engine configuration ID ${engineConfigId} not found.`
+                ); 
+            }
+
+            // Success
+            this.log.info(
+                `Using engine configuration: ${matched.name} (ID: ${matched.id})`
+            );
+
+            return matched.id;
+        
+       } catch (err) {
             const isExpectedError = err.response && err.response.notFound;
-            if (!isExpectedError) {
-                throw err;
+
+            if (isExpectedError) {
+                this.log.info('Expected API error occurred.');
             }
-        }
-        return engineConfigId;
+
+            throw err;
+       }
     }
     
     private async generatePDFReport(scanResult: ScanResults){
@@ -751,26 +810,21 @@ export class CxClient {
         return versionInfo;
     }
 
-    private async initializeEngineConfig()
-    {
-        if(engineConfigurationConstants[this.sastConfig.engineConfigurationId] == engineConfigurationConstants[0]){
+    private async initializeEngineConfig(): Promise<void> {
+        
+        if (!this.sastConfig.engineConfigurationId) {
             this.sastConfig.engineConfigurationId = 0;
+            return;
         }
-        else {
-            let configId = await this.getEngineConfigurationId(engineConfigurationConstants[this.sastConfig.engineConfigurationId]);
-            if(configId == 0)
-            {
-                if(engineConfigurationConstants[this.sastConfig.engineConfigurationId] == engineConfigurationConstants[6])
-                    throw new Error("The Build Failed : SAST Engine Version 9.6.2 and lower version does not supports Force Scan (Source character encoding Configuration).");
-                else
-                    throw new Error("The Build Failed : Selected source character encoding Configuration -> ${this.sastConfig.engineConfigurationName} not found.");
-                
-                return Promise.reject(status); 
-            }
-            else
-                this.sastConfig.engineConfigurationId = configId;
-        } 
+
+        // Validate config exists on the server (custom or known)
+        const originalConfigId = this.sastConfig.engineConfigurationId;
+        
+        const configId = await this.getEngineConfigurationId(originalConfigId);
+
+        this.sastConfig.engineConfigurationId = configId;
     }
+
 
     private async initDynamicFields() {
         const versionInfo = await this.getVersionInfo();
@@ -811,7 +865,7 @@ export class CxClient {
         {
             this.engineConfigurationId = this.sastConfig.engineConfigurationId;
         }else{
-            this.log.info("Engine Configuration ID is not configured, Using default.");
+            this.log.info("Using project default engine configuration.");
         }
 
         if (this.config.projectId) {

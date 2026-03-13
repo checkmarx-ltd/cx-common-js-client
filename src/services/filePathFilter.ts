@@ -30,34 +30,6 @@ export class FilePathFilter {
     includes(path: string): boolean {
         const matchesAnyInclusionPattern = micromatch.any(path, this.include, FilePathFilter.fileMatcherOptions);
         const matchesAnyExclusionPattern = micromatch.any(path, this.exclude, FilePathFilter.fileMatcherOptions);
-
-        if (!matchesAnyInclusionPattern) {
-            return false;
-        }
-        if (matchesAnyExclusionPattern) {
-            const hasSpecificInclusionPattern = this.include.some(includePattern => {
-                if (micromatch.isMatch(path, includePattern, FilePathFilter.fileMatcherOptions)) {
-                    const includeSegments = includePattern.split('/').filter(s => s && s !== '**');
-
-                    return this.exclude.some(excludePattern => {
-                        if (micromatch.isMatch(path, excludePattern, FilePathFilter.fileMatcherOptions)) {
-                            const excludeSegments = excludePattern.split('/').filter(s => s && s !== '**');
-                            return includeSegments.length > excludeSegments.length ||
-                                   (includeSegments.length === excludeSegments.length &&
-                                    includeSegments.some(s => s.includes('.')) &&
-                                    excludePattern.endsWith('/**'));
-                        }
-                        return false;
-                    });
-                }
-                return false;
-            });
-
-            if (hasSpecificInclusionPattern) {
-                return true;
-            }
-        }
-
         return matchesAnyInclusionPattern && !matchesAnyExclusionPattern;
     }
 
@@ -65,12 +37,16 @@ export class FilePathFilter {
         return Boolean(this.include.length)
     }
 
-    getIncludePatterns(): string[] {
-        return [...this.include];
-    }
-
-    getExcludePatterns(): string[] {
-        return [...this.exclude];
+    /**
+     * Check if a directory path should be completely excluded from traversal.
+     * This is used for performance optimization to skip entire directories.
+     * Returns true if the directory matches an exclusion pattern that would exclude ALL its contents.
+     */
+isDirectoryExcluded(dirPath: string): boolean {
+        // Check if this directory path matches any exclusion pattern
+        // We append /** to test if all contents would be excluded
+        const dirPattern = dirPath + '/**';
+        return micromatch.any(dirPattern, this.exclude, FilePathFilter.fileMatcherOptions);
     }
 
     private parseFilterPattern(filterPattern: string) {
@@ -100,14 +76,8 @@ export class FilePathFilter {
         const foldersAsFilterPatterns = excludedFolders.split(this.PATTERN_SEPARATOR)
             .map(pattern => pattern.trim())
             .filter(pattern => pattern)
-            .map(pattern => {
-                if (pattern.includes('/') || pattern.includes('\\')) {
-                    const normalizedPattern = pattern.replace(/\\/g, '/');
-                    return `${normalizedPattern}/**`;
-                } else {
-                    return `${pattern}/**`;
-                }
-            });
+              // The folder should be excluded when found at any depth.
+            .map(pattern => `**/${pattern}/**`);
 
         this.exclude.push(...foldersAsFilterPatterns);
     }
