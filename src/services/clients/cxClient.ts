@@ -23,7 +23,6 @@ import { NewVulnerabilitiesThresholdError } from "../../dto/newVulnerabilitiesTh
 import { CustomFields } from "../../dto/api/customFields";
 const fs = require('fs');
 import { engineConfiguration } from "../../dto/api/engineConfiguration";
-import { engineConfigurationConstants } from "../../dto/api/engineConfigurationConstants";
 
 /**
  * High-level CX API client that uses specialized clients internally.

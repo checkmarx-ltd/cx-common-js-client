@@ -191,7 +191,7 @@ export class ScaClient {
             this.stopwatch.start();
             this.log.info("Scan started successfully. Scan ID: " + this.scanId);
         } catch (err) {
-            throw Error("Error creating CxSCA scan. " + this.getErrorMessage(err));
+            throw new Error("Error creating CxSCA scan. " + this.getErrorMessage(err));
         }
     }
 
@@ -561,7 +561,7 @@ export class ScaClient {
 
     private async fetchProjectResolvingConfiguration(): Promise<ScaResolvingConfiguration> {
         const guid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c: string) => {
-            const r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+            const r = Math.trunc(Math.random() * 16), v = c == 'x' ? r : (r & 0x3 | 0x8);
             return v.toString(16);
         });
         this.log.info(`Sending a request to fetch resolving configuration.`);
@@ -751,7 +751,7 @@ The Build Failed for the Following Reasons:
             return result;
         }
         catch (err) {
-            throw Error("Error retrieving CxSCA scan results. " + this.getErrorMessage(err));
+            throw new Error("Error retrieving CxSCA scan results. " + this.getErrorMessage(err));
         }
     }
 

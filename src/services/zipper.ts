@@ -95,7 +95,7 @@ export default class Zipper {
         return result;
     }
 
-    private skipExcludedDirectories = (parentDir: string, dirs: any[], discoverNextDir: () => void) => {
+    private readonly skipExcludedDirectories = (parentDir: string, dirs: any[], discoverNextDir: () => void) => {
         // Filter directories in-place by checking each against the filters
         for (let i = dirs.length - 1; i >= 0; i--) {
             const dirStats = dirs[i];
