@@ -547,7 +547,7 @@ export class HttpClient {
             } else if (this.username && this.password) {
                 await this.loginWithStoredCredentials();
             } else if (this.isSsoLogin && this.loginType === 'WindowsSSO' ) {
-                this.ssoLogin();
+               await this.ssoLogin();
             }
 
             const optionsClone = Object.assign({}, options);

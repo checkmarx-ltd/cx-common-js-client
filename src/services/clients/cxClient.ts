@@ -147,10 +147,9 @@ export class CxClient {
                         `Version ${systemVersion} does not support engine configuration: Fast Scan (ID: ${engineConfigId}).`
                     );
                 }
-                else {
+            }else {
                     this.log.info('System version not available.');
                 }
-            }
 
             // Fetch engine configurations
             const configs: engineConfiguration[] =
