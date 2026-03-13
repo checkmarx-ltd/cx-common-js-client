@@ -366,7 +366,7 @@ export class ScaClient {
                     pathToResultJSONFile.lastIndexOf(path.sep)
                 );
 
-                if (baseDir === "" || pathToResultJSONFile.lastIndexOf(path.sep) === -1) {
+                if (baseDir === "" || !pathToResultJSONFile.includes(path.sep)) {
                 pathToContainerResultJSONFile = "container-results.json";
             } else {
                 pathToContainerResultJSONFile =

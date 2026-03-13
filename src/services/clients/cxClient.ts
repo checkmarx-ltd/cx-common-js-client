@@ -124,30 +124,32 @@ export class CxClient {
             }
 
             const systemVersion = versionInfo.version;
-            if (!systemVersion) {
-                this.log.info('System version not available.');
-            } else {
-                    // Compare versions (>= 9.6.2)
-                    const isVersionSupported = (() => {
-                        const current = systemVersion.split('.').map(Number);
-                        const minimum = [9, 6, 2];
-                        const maxLength = Math.max(current.length, minimum.length);
+            if (systemVersion) {
+                // Compare versions (>= 9.6.2)
+                const isVersionSupported = (() => {
+                    const current = systemVersion.split('.').map(Number);
+                    const minimum = [9, 6, 2];
+                    const maxLength = Math.max(current.length, minimum.length);
 
-                        for (let i = 0; i < maxLength; i++) {
-                            const c = current[i] ?? 0;
-                            const m = minimum[i] ?? 0;
-            
-                            if (c > m) return true;
-                            if (c < m) return false;
-                        }
-                        return true;
-                    })();
+                    for (let i = 0; i < maxLength; i++) {
+                        const c = current[i] ?? 0;
+                        const m = minimum[i] ?? 0;
 
-                    if (!isVersionSupported && engineConfigId == 6) {
-                        throw new Error(
-                            `Version ${systemVersion} does not support engine configuration: Fast Scan (ID: ${engineConfigId}).`
-                        );
+                        if (c > m) return true;
+                        if (c < m) return false;
                     }
+                    return true;
+                })();
+
+
+                if (!isVersionSupported && engineConfigId == 6) {
+                    throw new Error(
+                        `Version ${systemVersion} does not support engine configuration: Fast Scan (ID: ${engineConfigId}).`
+                    );
+                }
+                else {
+                    this.log.info('System version not available.');
+                }
             }
 
             // Fetch engine configurations
