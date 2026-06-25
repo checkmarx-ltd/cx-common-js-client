@@ -9,7 +9,15 @@ pool:
 steps:
 - task: Npm@1
   inputs:
-    command: install
+    command: 'custom'
+    customCommand: 'ci --ignore-scripts'
+  displayName: 'install dependencies'
+
+- task: Npm@1
+  inputs:
+    command: 'custom'
+    customCommand: 'run build'
+  displayName: 'build'
 
 - ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/master') }}:
   - task: Npm@1
